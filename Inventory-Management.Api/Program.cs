@@ -1,3 +1,5 @@
+using Inventory_Management.Infrastructure.Persistence.Data;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using TmsApi.Api;
 
@@ -9,7 +11,16 @@ builder.Services.AddAuthorization();
 builder.Services.AddAuthentication();
 builder.Services.AddProblemDetails();
 
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("ImsDbConnectionString")));
+
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await DatabaseSeeder.SeedAsync(dbContext);
+}
 
 app.UseMiddleware<RequestLoggingMiddleware>();
 

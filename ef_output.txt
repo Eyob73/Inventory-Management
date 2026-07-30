@@ -1,0 +1,4 @@
+C:\Users\sata\Desktop\project\Inventory-Management\Inventory-Management.Api\Inventory-Management.Api.csproj : warning NU1903: Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+Build started...
+Build succeeded.
+Your startup project 'Inventory-Management.Api' doesn't reference Microsoft.EntityFrameworkCore.Design. This package is required for the Entity Framework Core Tools to work. Ensure your startup project is correct, install the package, and try again.
