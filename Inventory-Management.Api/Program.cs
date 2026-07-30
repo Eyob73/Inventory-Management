@@ -1,14 +1,19 @@
 using Scalar.AspNetCore;
+using TmsApi.Api;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddControllers();
+builder.Services.AddAuthorization();
+builder.Services.AddAuthentication();
+builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+app.UseMiddleware<RequestLoggingMiddleware>();
+
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -16,6 +21,21 @@ if (app.Environment.IsDevelopment())
 
 }
 
+app.UseStatusCodePages();
+
 app.UseHttpsRedirection();
+
+app.UseRouting();
+
+app.UseAuthentication();
+
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.MapGet("/api/error", () =>
+{
+    throw new Exception("Simulated database failure for ProblemDetails testing");
+});
 
 app.Run();
