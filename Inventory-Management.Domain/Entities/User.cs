@@ -2,7 +2,7 @@ using Inventory_Management.Domain.Common;
 
 namespace Inventory_Management.Domain.Entities;
 
-public class User : IMultiTenant
+public class User : IMultiTenant, ISoftDelete
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid? TenantId { get; set; }
@@ -12,6 +12,8 @@ public class User : IMultiTenant
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public bool IsActive { get; set; } = true;
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public Guid RoleId { get; set; }

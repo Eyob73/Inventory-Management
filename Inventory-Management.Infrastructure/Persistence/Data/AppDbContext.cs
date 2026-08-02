@@ -34,34 +34,83 @@ public class AppDbContext : DbContext
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
 
-        // Apply global query filter for IMultiTenant entities
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            if (typeof(IMultiTenant).IsAssignableFrom(entityType.ClrType))
+            var clrType = entityType.ClrType;
+            bool isMultiTenant = typeof(IMultiTenant).IsAssignableFrom(clrType);
+            bool isSoftDelete  = typeof(ISoftDelete).IsAssignableFrom(clrType);
+
+            if (isMultiTenant && isSoftDelete)
+            {
+                // Combined filter: tenant isolation + soft-delete exclusion
+                var method = typeof(AppDbContext)
+                    .GetMethod(nameof(SetCombinedQueryFilter), BindingFlags.NonPublic | BindingFlags.Instance)!
+                    .MakeGenericMethod(clrType);
+                method.Invoke(this, [modelBuilder]);
+            }
+            else if (isMultiTenant)
             {
                 var method = typeof(AppDbContext)
                     .GetMethod(nameof(SetTenantQueryFilter), BindingFlags.NonPublic | BindingFlags.Instance)!
-                    .MakeGenericMethod(entityType.ClrType);
-                method.Invoke(this, new object[] { modelBuilder });
+                    .MakeGenericMethod(clrType);
+                method.Invoke(this, [modelBuilder]);
+            }
+            else if (isSoftDelete)
+            {
+                var method = typeof(AppDbContext)
+                    .GetMethod(nameof(SetSoftDeleteQueryFilter), BindingFlags.NonPublic | BindingFlags.Instance)!
+                    .MakeGenericMethod(clrType);
+                method.Invoke(this, [modelBuilder]);
             }
         }
     }
 
-    private void SetTenantQueryFilter<TEntity>(ModelBuilder modelBuilder) where TEntity : class, IMultiTenant
+    private void SetTenantQueryFilter<TEntity>(ModelBuilder modelBuilder)
+        where TEntity : class, IMultiTenant
     {
-        modelBuilder.Entity<TEntity>().HasQueryFilter(e => e.TenantId == (_currentTenant != null ? _currentTenant.TenantId : null) || (_currentTenant == null || _currentTenant.TenantId == null));
+        modelBuilder.Entity<TEntity>().HasQueryFilter(e =>
+            e.TenantId == (_currentTenant != null ? _currentTenant.TenantId : null)
+            || _currentTenant == null
+            || _currentTenant.TenantId == null);
+    }
+
+    private void SetCombinedQueryFilter<TEntity>(ModelBuilder modelBuilder)
+        where TEntity : class, IMultiTenant, ISoftDelete
+    {
+        modelBuilder.Entity<TEntity>().HasQueryFilter(e =>
+            !e.IsDeleted
+            && (e.TenantId == (_currentTenant != null ? _currentTenant.TenantId : null)
+                || _currentTenant == null
+                || _currentTenant.TenantId == null));
+    }
+
+    private void SetSoftDeleteQueryFilter<TEntity>(ModelBuilder modelBuilder)
+        where TEntity : class, ISoftDelete
+    {
+        modelBuilder.Entity<TEntity>().HasQueryFilter(e => !e.IsDeleted);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        if (_currentTenant?.TenantId != null)
+        var now = DateTime.UtcNow;
+
+        foreach (var entry in ChangeTracker.Entries())
         {
-            foreach (var entry in ChangeTracker.Entries<IMultiTenant>())
+            // Auto-assign TenantId on new multi-tenant entities
+            if (entry.State == EntityState.Added
+                && entry.Entity is IMultiTenant multiTenantEntity
+                && multiTenantEntity.TenantId == null
+                && _currentTenant?.TenantId != null)
             {
-                if (entry.State == EntityState.Added && entry.Entity.TenantId == null)
-                {
-                    entry.Entity.TenantId = _currentTenant.TenantId;
-                }
+                multiTenantEntity.TenantId = _currentTenant.TenantId;
+            }
+
+            // Convert hard-delete to soft-delete for ISoftDelete entities
+            if (entry.State == EntityState.Deleted && entry.Entity is ISoftDelete softDeleteEntity)
+            {
+                entry.State = EntityState.Modified;
+                softDeleteEntity.IsDeleted = true;
+                softDeleteEntity.DeletedAt = now;
             }
         }
 
