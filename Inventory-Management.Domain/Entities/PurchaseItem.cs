@@ -1,10 +1,11 @@
-using System;
+using Inventory_Management.Domain.Common;
 
 namespace Inventory_Management.Domain.Entities;
 
-public class PurchaseItem
+public class PurchaseItem : IMultiTenant
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid? TenantId { get; set; }
     public Guid PurchaseId { get; set; }
     public Purchase? Purchase { get; set; }
 

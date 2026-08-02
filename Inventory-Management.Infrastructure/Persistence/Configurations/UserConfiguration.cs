@@ -12,14 +12,14 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(u => u.Username)
             .IsRequired()
-            .HasMaxLength(100);
+            .HasMaxLength(50);
 
         builder.HasIndex(u => u.Username)
             .IsUnique();
 
         builder.Property(u => u.Email)
             .IsRequired()
-            .HasMaxLength(200);
+            .HasMaxLength(50);
 
         builder.HasIndex(u => u.Email)
             .IsUnique();
