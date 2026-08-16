@@ -10,5 +10,5 @@ public class UpdateProductDto
     public decimal Cost { get; set; }
     public int QuantityInStock { get; set; }
     public Guid CategoryId { get; set; }
-    public Guid SupplierId { get; set; }
+    public Guid? SupplierId { get; set; }
 }

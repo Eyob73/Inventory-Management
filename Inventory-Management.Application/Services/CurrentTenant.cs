@@ -1,6 +1,6 @@
 using Inventory_Management.Application.Interfaces.Services;
 
-namespace Inventory_Management.Infrastructure.Services;
+namespace Inventory_Management.Application.Services;
 
 public class CurrentTenant : ICurrentTenant
 {

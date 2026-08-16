@@ -20,6 +20,6 @@ public class Product : IMultiTenant, ISoftDelete
     public Guid CategoryId { get; set; }
     public Category? Category { get; set; }
 
-    public Guid SupplierId { get; set; }
+    public Guid? SupplierId { get; set; }
     public Supplier? Supplier { get; set; }
 }

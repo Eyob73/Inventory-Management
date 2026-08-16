@@ -4,7 +4,6 @@ using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Application.Services;
 using Inventory_Management.Infrastructure.Persistence.Data;
 using Inventory_Management.Infrastructure.Persistence.Repositories;
-using Inventory_Management.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using TmsApi.Api;
@@ -19,6 +18,14 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("ImsDbConnectionString")));
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAngular", policy =>
+    policy.WithOrigins("http://localhost:4200")
+    .AllowAnyHeader()
+    .AllowAnyMethod());
+});
 
 // Multi-Tenant Services
 builder.Services.AddScoped<ICurrentTenant, CurrentTenant>();
@@ -55,6 +62,8 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
+
+app.UseCors("AllowAngular");
 
 app.UseStatusCodePages();
 
