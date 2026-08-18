@@ -3,10 +3,13 @@ using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Domain.Common;
 using Inventory_Management.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+
 
 namespace Inventory_Management.Infrastructure.Persistence.Data;
 
-public class AppDbContext : DbContext
+public class AppDbContext : IdentityDbContext<AppUser>
 {
     private readonly ICurrentTenant? _currentTenant;
 
@@ -36,7 +39,7 @@ public class AppDbContext : DbContext
         {
             var clrType = entityType.ClrType;
             bool isMultiTenant = typeof(IMultiTenant).IsAssignableFrom(clrType);
-            bool isSoftDelete  = typeof(ISoftDelete).IsAssignableFrom(clrType);
+            bool isSoftDelete = typeof(ISoftDelete).IsAssignableFrom(clrType);
 
             if (isMultiTenant && isSoftDelete)
             {

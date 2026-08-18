@@ -2,11 +2,14 @@ using Inventory_Management.Api.Middleware;
 using Inventory_Management.Application.Interfaces.Repositories;
 using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Application.Services;
+using Inventory_Management.Domain.Entities;
 using Inventory_Management.Infrastructure.Persistence.Data;
 using Inventory_Management.Infrastructure.Persistence.Repositories;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using TmsApi.Api;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,6 +46,21 @@ builder.Services.AddScoped<ISaleService, SaleService>();
 builder.Services.AddScoped<ISaleItemService, SaleItemService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<IPurchaseItemService, PurchaseItemService>();
+
+builder.Services.AddIdentityCore<AppUser>(options =>
+{
+    // Enterprise Password Policy
+    options.Password.RequiredLength = 12;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireDigit = true;
+    options.Password.RequireNonAlphanumeric = true;
+    // Brute-Force Lockout Protection
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.AllowedForNewUsers = true;
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<AppDbContext>();
 
 var app = builder.Build();
 
