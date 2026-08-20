@@ -5,7 +5,7 @@ using Inventory_Management.Domain.Entities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
-namespace TmsApi.Infrastructure.Services;
+namespace Inventory_Management.Infrastructure.Services;
 
 public class TokenService
 {

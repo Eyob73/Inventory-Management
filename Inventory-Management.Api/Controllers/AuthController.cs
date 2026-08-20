@@ -2,6 +2,7 @@ using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Domain.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Inventory_Management.Application.DTOs.Auth;
 
 namespace Inventory_Management.Api.Controllers;
 
@@ -9,111 +10,60 @@ namespace Inventory_Management.Api.Controllers;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
-    private readonly UserManager<AppUser> _userManager;
-    private readonly RoleManager<IdentityRole> _roleManager;
-    private readonly ICurrentTenant _currentTenant;
-
-    public AuthController(
-        UserManager<AppUser> userManager,
-        RoleManager<IdentityRole> roleManager,
-        ICurrentTenant currentTenant)
+    private readonly IAuthService _authService;
+    public AuthController(IAuthService authService)
     {
-        _userManager = userManager;
-        _roleManager = roleManager;
-        _currentTenant = currentTenant;
+        _authService = authService;
     }
-
-    public record RegisterRequest(
-        string Email,
-        string Password,
-        string FirstName,
-        string LastName,
-        string Role,
-        Guid? TenantId = null);
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
     {
-        var existingUser = await _userManager.FindByEmailAsync(request.Email);
-        if (existingUser != null)
+        var (success, errors, alreadyExists) = await _authService.RegisterAsync(request);
+        if (alreadyExists)
         {
-            // Prevent account enumeration by returning a generic response
-            return Ok(new
-            {
-                message = "Registration request received."
-            });
+            return Ok(new { message = "Registration request received." });
         }
-
-        var tenantId = request.TenantId ?? _currentTenant.TenantId;
-
-        var user = new AppUser
+        if (!success)
         {
-            UserName = request.Email,
-            Email = request.Email,
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            TenantId = tenantId
-        };
-
-        var result = await _userManager.CreateAsync(user, request.Password);
-        if (!result.Succeeded)
-        {
-            var errors = result.Errors.Select(e => e.Description);
             return BadRequest(new { errors });
         }
-
-        // Ensure requested role exists
-        if (!await _roleManager.RoleExistsAsync(request.Role))
-        {
-            await _roleManager.CreateAsync(new IdentityRole(request.Role));
-        }
-        await _userManager.AddToRoleAsync(user, request.Role);
-
-        return Ok(new { message = "Registration successful.", tenantId });
+        return Ok(new { message = "Registration successful." });
     }
 
-    public record LoginRequest(string Email, string Password);
-
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     {
-        var user = await _userManager.FindByEmailAsync(request.Email);
-        if (user == null)
+        try
         {
-            return Unauthorized(new
-            {
-                detail = "Invalid Credentials."
-            });
+            var (accessToken, refreshToken) = await _authService.LoginAsync(request);
+            return Ok(new { accessToken, refreshToken });
         }
-
-        if (await _userManager.IsLockedOutAsync(user))
+        catch (InvalidOperationException ex) when (ex.Message.Contains("locked"))
         {
-            return StatusCode(423, new
-            {
-                detail = "Account locked due to multiple failed login attempts. Try again in 15 minutes."
-            });
+            return StatusCode(423, new { detail = ex.Message });
         }
-
-        var validPassword = await _userManager.CheckPasswordAsync(user, request.Password);
-        if (!validPassword)
+        catch (InvalidOperationException)
         {
-            await _userManager.AccessFailedAsync(user);
-            return Unauthorized(new
-            {
-                detail = "Invalid Credentials."
-            });
+            return Unauthorized(new { detail = "Invalid credentials." });
         }
+    }
 
-        // Reset failed attempt counter on successful login
-        await _userManager.ResetAccessFailedCountAsync(user);
-
-        return Ok(new
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh([FromBody] RefreshRequestDto request)
+    {
+        try
         {
-            userId = user.Id,
-            email = user.Email,
-            firstName = user.FirstName,
-            lastName = user.LastName,
-            tenantId = user.TenantId
-        });
+            var (accessToken, refreshToken) = await _authService.RefreshAsync(request.RefreshToken);
+            return Ok(new { accessToken, refreshToken });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("theft"))
+        {
+            return Unauthorized(new { detail = ex.Message });
+        }
+        catch (InvalidOperationException)
+        {
+            return Unauthorized(new { detail = "Refresh token expired or revoked." });
+        }
     }
 }

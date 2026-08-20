@@ -3,6 +3,7 @@ using Inventory_Management.Api.Middleware;
 using Inventory_Management.Application.Interfaces.Repositories;
 using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Application.Services;
+using Inventory_Management.Infrastructure.Services;
 using Inventory_Management.Domain.Entities;
 using Inventory_Management.Infrastructure.Persistence.Data;
 using Inventory_Management.Infrastructure.Persistence.Repositories;
@@ -11,8 +12,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
-using TmsApi.Api;
-using TmsApi.Infrastructure.Services;
+using Inventory_Management.Api;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -51,6 +51,7 @@ builder.Services.AddScoped<ISaleItemService, SaleItemService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<IPurchaseItemService, PurchaseItemService>();
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddIdentityCore<AppUser>(options =>
 {

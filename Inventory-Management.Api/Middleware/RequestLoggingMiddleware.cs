@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace TmsApi.Api;
+namespace Inventory_Management.Api;
 
 public class RequestLoggingMiddleware
 {
