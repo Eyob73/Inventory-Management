@@ -13,14 +13,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Inventory_Management.Api;
-
+using Microsoft.AspNetCore.Antiforgery;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 builder.Services.AddAuthorization();
-builder.Services.AddAuthentication();
 builder.Services.AddProblemDetails();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -93,6 +92,23 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
     };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            if (context.Request.Cookies.TryGetValue("ims_auth", out var token))
+            {
+                context.Token = token;
+            }
+            return Task.CompletedTask;
+        }
+    };
+});
+
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-XSRF-TOKEN";
 });
 
 var app = builder.Build();
@@ -103,24 +119,42 @@ using (var scope = app.Services.CreateScope())
     await DatabaseSeeder.SeedAsync(dbContext);
 }
 
-app.UseMiddleware<RequestLoggingMiddleware>();
-app.UseMiddleware<TenantResolverMiddleware>();
-
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
 
-app.UseCors("AllowAngular");
-
 app.UseStatusCodePages();
+
+app.UseMiddleware<RequestLoggingMiddleware>();
+
+app.UseMiddleware<TenantResolverMiddleware>();
 
 app.UseHttpsRedirection();
 
 app.UseRouting();
 
+app.UseCors("AllowAngular");
+
 app.UseAuthentication();
+
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true || context.Request.Cookies.ContainsKey("ims_auth"))
+    {
+        var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
+        var tokens = antiforgery.GetAndStoreTokens(context);
+        context.Response.Cookies.Append("XSRF-TOKEN", tokens.RequestToken!, new CookieOptions
+        {
+            HttpOnly = false,
+            Secure = !builder.Environment.IsDevelopment(),
+            SameSite = SameSiteMode.Strict,
+        });
+    }
+
+    await next(context);
+});
 
 app.UseAuthorization();
 

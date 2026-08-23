@@ -3,6 +3,7 @@ using Inventory_Management.Application.DTOs.Product;
 using Inventory_Management.Application.Features.Products.Commands;
 using Inventory_Management.Application.Features.Products.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -54,6 +55,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     [EndpointSummary("Create a new product")]
     [EndpointDescription("Adds a new product item to the inventory catalog.")]
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status201Created)]

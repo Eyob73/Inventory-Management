@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -58,7 +60,7 @@ public class AuthController : ControllerBase
                 Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
 
-            return Ok(new { accessToken });
+            return Ok(new { message = "Login successful." });
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("locked"))
         {
@@ -68,6 +70,23 @@ public class AuthController : ControllerBase
         {
             return Unauthorized(new { detail = "Invalid credentials." });
         }
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public IActionResult Me()
+    {
+        var user = new
+        {
+            id = User.FindFirstValue(ClaimTypes.NameIdentifier),
+            email = User.FindFirstValue(ClaimTypes.Email),
+            username = User.FindFirstValue(ClaimTypes.Name),
+            firstName = User.FindFirstValue("FirstName"),
+            lastName = User.FindFirstValue("LastName"),
+            roles = User.FindAll(ClaimTypes.Role).Select(r => r.Value).ToList()
+        };
+
+        return Ok(user);
     }
 
     [HttpPost("refresh")]
