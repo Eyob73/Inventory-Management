@@ -1,5 +1,6 @@
 using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Domain.Entities;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Inventory_Management.Application.DTOs.Auth;
@@ -11,9 +12,12 @@ namespace Inventory_Management.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
-    public AuthController(IAuthService authService)
+    private readonly IWebHostEnvironment _env;
+
+    public AuthController(IAuthService authService, IWebHostEnvironment env)
     {
         _authService = authService;
+        _env = env;
     }
 
     [HttpPost("register")]
@@ -37,7 +41,24 @@ public class AuthController : ControllerBase
         try
         {
             var (accessToken, refreshToken) = await _authService.LoginAsync(request);
-            return Ok(new { accessToken, refreshToken });
+
+            Response.Cookies.Append("ims_auth", accessToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = !_env.IsDevelopment(),
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddMinutes(15)
+            });
+
+            Response.Cookies.Append("ims_refresh", refreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = !_env.IsDevelopment(),
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
+            });
+
+            return Ok(new { accessToken });
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("locked"))
         {
