@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Inventory_Management.Application.DTOs.Auth;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Inventory_Management.Api.Controllers;
 
@@ -38,6 +39,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting("AuthLimiter")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
     {
         try
