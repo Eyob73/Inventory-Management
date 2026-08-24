@@ -21,8 +21,10 @@ public class TokenService
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id),
+            new Claim(ClaimTypes.Name, user.UserName ?? user.Email ?? user.Id),
             new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
             new Claim("FirstName", user.FirstName),
+            new Claim("LastName", user.LastName),
         };
         foreach (var role in roles)
         {

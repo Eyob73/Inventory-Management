@@ -85,6 +85,26 @@ public class AuthService : IAuthService
         return (accessToken, refreshToken.Token);
     }
 
+    public async Task LogoutAsync(string? refreshToken)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return;
+        }
+
+        var storedToken = await _context.RefreshTokens
+            .FirstOrDefaultAsync(rt => rt.Token == refreshToken);
+
+        if (storedToken == null)
+        {
+            return;
+        }
+
+        storedToken.IsRevoked = true;
+        storedToken.ExpiresAt = DateTime.UtcNow.AddSeconds(-1);
+        await _context.SaveChangesAsync();
+    }
+
     public async Task<(string AccessToken, string RefreshToken)> RefreshAsync(string refreshToken)
     {
         var storedToken = await _context.RefreshTokens.FirstOrDefaultAsync(rt => rt.Token == refreshToken);

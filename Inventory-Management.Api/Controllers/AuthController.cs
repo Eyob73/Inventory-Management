@@ -74,6 +74,18 @@ public class AuthController : ControllerBase
         }
     }
 
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        var refreshToken = Request.Cookies["ims_refresh"];
+        await _authService.LogoutAsync(refreshToken);
+
+        Response.Cookies.Delete("ims_auth");
+        Response.Cookies.Delete("ims_refresh");
+
+        return Ok(new { message = "Logout successful." });
+    }
+
     [HttpGet("me")]
     [Authorize]
     public IActionResult Me()
