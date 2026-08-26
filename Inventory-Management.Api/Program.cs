@@ -59,6 +59,7 @@ builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<IPurchaseItemService, PurchaseItemService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddIdentityCore<AppUser>(options =>
 {
@@ -114,6 +115,18 @@ builder.Services.AddAntiforgery(options =>
 
 builder.Services.AddRateLimiter(options =>
 {
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json";
+
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            detail = "Too many requests. Please try again later."
+        }, cancellationToken: token);
+    };
+
     options.AddFixedWindowLimiter("AuthLimiter", opt =>
     {
         opt.PermitLimit = 5;
