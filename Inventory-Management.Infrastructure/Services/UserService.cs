@@ -1,3 +1,4 @@
+using Inventory_Management.Application.DTOs.Common;
 using Inventory_Management.Application.DTOs.User;
 using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Domain.Entities;
@@ -32,6 +33,43 @@ public class UserService : IUserService
         return userDtos;
     }
 
+    public async Task<PagedResponse<UserDto>> GetPagedAsync(int page, int pageSize, string? search, CancellationToken cancellationToken = default)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 10 : pageSize > 50 ? 50 : pageSize;
+
+        var query = _userManager.Users.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var lower = search.ToLower();
+            query = query.Where(u =>
+                (u.FirstName != null && u.FirstName.ToLower().Contains(lower)) ||
+                (u.LastName != null && u.LastName.ToLower().Contains(lower)) ||
+                (u.Email != null && u.Email.ToLower().Contains(lower)) ||
+                (u.UserName != null && u.UserName.ToLower().Contains(lower)));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var pagedUsers = await query
+            .OrderBy(u => u.FirstName ?? u.UserName ?? u.Email)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        var dtos = new List<UserDto>();
+        foreach (var user in pagedUsers)
+            dtos.Add(await MapToDtoAsync(user));
+
+        return new PagedResponse<UserDto>
+        {
+            Items = dtos,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+        };
+    }
+
     public async Task<UserDto?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByIdAsync(id);
@@ -50,7 +88,7 @@ public class UserService : IUserService
 
         var user = new AppUser
         {
-            UserName = dto.Email,
+            UserName = !string.IsNullOrWhiteSpace(dto.UserName) ? dto.UserName : dto.Email,
             Email = dto.Email,
             FirstName = dto.FirstName,
             LastName = dto.LastName,
@@ -86,7 +124,7 @@ public class UserService : IUserService
         }
 
         user.Email = dto.Email;
-        user.UserName = dto.Email;
+        user.UserName = !string.IsNullOrWhiteSpace(dto.UserName) ? dto.UserName : dto.Email;
         user.FirstName = dto.FirstName;
         user.LastName = dto.LastName;
         user.PhoneNumber = dto.PhoneNumber;

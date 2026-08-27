@@ -1,3 +1,4 @@
+using Inventory_Management.Application.DTOs.Common;
 using Inventory_Management.Application.DTOs.User;
 using Inventory_Management.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -29,6 +30,20 @@ public class UsersController : ControllerBase
     {
         var users = await _userService.GetAllAsync(cancellationToken);
         return Ok(users);
+    }
+
+    [HttpGet("paged")]
+    [EndpointSummary("Retrieve users with pagination")]
+    [EndpointDescription("Fetches a paginated list of users with optional search filtering.")]
+    [ProducesResponseType(typeof(PagedResponse<UserDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult> GetPaged(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _userService.GetPagedAsync(page, pageSize, search, cancellationToken);
+        return Ok(result);
     }
 
     [HttpGet("{id}")]

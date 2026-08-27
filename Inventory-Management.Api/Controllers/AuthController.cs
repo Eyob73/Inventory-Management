@@ -88,19 +88,27 @@ public class AuthController : ControllerBase
 
     [HttpGet("me")]
     [Authorize]
-    public IActionResult Me()
+    public async Task<IActionResult> Me([FromServices] UserManager<AppUser> userManager)
     {
-        var user = new
-        {
-            id = User.FindFirstValue(ClaimTypes.NameIdentifier),
-            email = User.FindFirstValue(ClaimTypes.Email),
-            username = User.FindFirstValue(ClaimTypes.Name),
-            firstName = User.FindFirstValue("FirstName"),
-            lastName = User.FindFirstValue("LastName"),
-            roles = User.FindAll(ClaimTypes.Role).Select(r => r.Value).ToList()
-        };
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
 
-        return Ok(user);
+        var user = await userManager.FindByIdAsync(userId);
+        if (user == null)
+            return NotFound(new { detail = "User not found." });
+
+        var roles = await userManager.GetRolesAsync(user);
+
+        return Ok(new
+        {
+            id = user.Id,
+            email = user.Email,
+            userName = user.UserName,
+            firstName = user.FirstName,
+            lastName = user.LastName,
+            roles = roles
+        });
     }
 
     [HttpPost("refresh")]
@@ -113,11 +121,40 @@ public class AuthController : ControllerBase
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("theft"))
         {
-            return Unauthorized(new { detail = ex.Message });
+            return Unauthorized(new { message = ex.Message });
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
-            return Unauthorized(new { detail = "Refresh token expired or revoked." });
+            return BadRequest(new { message = ex.Message });
         }
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    [EndpointSummary("Change user password")]
+    [EndpointDescription("Allows the currently authenticated user to update their account password.")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ChangePassword(
+        [FromBody] ChangePasswordDto dto,
+        [FromServices] UserManager<AppUser> userManager)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
+
+        var user = await userManager.FindByIdAsync(userId);
+        if (user == null)
+            return NotFound(new { detail = "User not found." });
+
+        var result = await userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors.Select(e => e.Description);
+            return BadRequest(new { errors });
+        }
+
+        return Ok(new { message = "Password updated successfully." });
     }
 }
