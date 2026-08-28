@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using Inventory_Management.Application.Interfaces.Repositories;
 using Inventory_Management.Infrastructure.Persistence.Data;
 using Microsoft.EntityFrameworkCore;
+using Inventory_Management.Domain.Common;
 
 namespace Inventory_Management.Infrastructure.Persistence.Repositories;
 
@@ -53,5 +54,16 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         var entity = await GetByIdAsync(id);
         if (entity != null)
             _dbSet.Remove(entity);
+    }
+
+    public async Task SoftDeleteAsync(Guid id)
+    {
+        var entity = await GetByIdAsync(id);
+        if (entity is ISoftDelete softDeleteEntity)
+        {
+            softDeleteEntity.IsDeleted = true;
+            softDeleteEntity.DeletedAt = DateTime.UtcNow;
+            _dbSet.Update(entity);
+        }
     }
 }

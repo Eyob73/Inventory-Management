@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Inventory_Management.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 [Tags("Products")]
@@ -55,7 +56,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Manager")]
     [EndpointSummary("Create a new product")]
     [EndpointDescription("Adds a new product item to the inventory catalog.")]
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status201Created)]
@@ -67,6 +68,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Admin,Manager")]
     [EndpointSummary("Update an existing product")]
     [EndpointDescription("Updates product properties such as price, cost, SKU, category, or stock level.")]
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
@@ -82,6 +84,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin")]
     [EndpointSummary("Delete a product")]
     [EndpointDescription("Removes a product from the inventory catalog by ID.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

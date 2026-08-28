@@ -22,7 +22,7 @@ public class DeleteProductCommandHandler : IRequestHandler<DeleteProductCommand>
         var product = await _productRepository.GetByIdAsync(command.Id)
             ?? throw new KeyNotFoundException($"Product with ID {command.Id} not found.");
 
-        await _productRepository.DeleteAsync(product.Id);
+        await _productRepository.SoftDeleteAsync(product.Id);
         await _unitOfWork.SaveChangesAsync();
     }
 }
