@@ -46,6 +46,7 @@ builder.Services.AddScoped<ICurrentTenant, CurrentTenant>();
 
 // Repositories
 builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+builder.Services.AddScoped<ISaleRepository, SaleRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 
 // Application Services & MediatR

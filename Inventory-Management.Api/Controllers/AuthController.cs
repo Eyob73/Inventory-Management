@@ -98,7 +98,7 @@ public class AuthController : ControllerBase
         if (user == null)
             return NotFound(new { detail = "User not found." });
 
-        var roles = await userManager.GetRolesAsync(user);
+        var role = await userManager.GetRolesAsync(user);
 
         return Ok(new
         {
@@ -107,7 +107,7 @@ public class AuthController : ControllerBase
             userName = user.UserName,
             firstName = user.FirstName,
             lastName = user.LastName,
-            roles = roles
+            roles = role
         });
     }
 
@@ -132,7 +132,7 @@ public class AuthController : ControllerBase
     [HttpPost("change-password")]
     [Authorize]
     [EndpointSummary("Change user password")]
-    [EndpointDescription("Allows the currently authenticated user to update their account password.")]
+    [EndpointDescription("Allows the user to update their account password.")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

@@ -10,7 +10,19 @@ public class SaleItemConfiguration : IEntityTypeConfiguration<SaleItem>
     {
         builder.HasKey(si => si.Id);
 
+        builder.Property(si => si.ProductName)
+            .HasMaxLength(100);
+
+        builder.Property(si => si.SKU)
+            .HasMaxLength(100);
+
         builder.Property(si => si.UnitPrice)
+            .HasColumnType("numeric(18,2)");
+
+        builder.Property(si => si.DiscountAmount)
+            .HasColumnType("numeric(18,2)");
+
+        builder.Property(si => si.Subtotal)
             .HasColumnType("numeric(18,2)");
 
         builder.Property(si => si.TotalPrice)

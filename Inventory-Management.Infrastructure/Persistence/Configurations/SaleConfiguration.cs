@@ -10,13 +10,52 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
     {
         builder.HasKey(s => s.Id);
 
+        builder.Property(s => s.SaleNumber)
+            .HasMaxLength(64)
+            .IsRequired();
+
+        builder.HasIndex(s => s.SaleNumber)
+            .IsUnique();
+
+        builder.Property(s => s.Subtotal)
+            .HasColumnType("numeric(18,2)");
+
+        builder.Property(s => s.DiscountAmount)
+            .HasColumnType("numeric(18,2)");
+
+        builder.Property(s => s.TaxAmount)
+            .HasColumnType("numeric(18,2)");
+
         builder.Property(s => s.TotalAmount)
             .HasColumnType("numeric(18,2)");
+
+        builder.Property(s => s.AmountReceived)
+            .HasColumnType("numeric(18,2)");
+
+        builder.Property(s => s.ChangeAmount)
+            .HasColumnType("numeric(18,2)");
+
+        builder.Property(s => s.PaymentMethod)
+            .HasMaxLength(50);
+
+        builder.Property(s => s.Status)
+            .HasMaxLength(50);
+
+        builder.Property(s => s.CustomerName)
+            .HasMaxLength(200);
+
+        builder.Property(s => s.CashierName)
+            .HasMaxLength(200);
 
         builder.HasOne(s => s.Customer)
             .WithMany(c => c.Sales)
             .HasForeignKey(s => s.CustomerId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(s => s.User)
+            .WithMany()
+            .HasForeignKey(s => s.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasMany(s => s.SaleItems)
             .WithOne(si => si.Sale)

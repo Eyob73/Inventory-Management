@@ -34,11 +34,12 @@ public class SaleItemService : ISaleItemService
         var item = new SaleItem
         {
             Id = Guid.NewGuid(),
-            SaleId = dto.SaleId,
             ProductId = dto.ProductId,
             Quantity = dto.Quantity,
             UnitPrice = dto.UnitPrice,
-            TotalPrice = dto.Quantity * dto.UnitPrice
+            DiscountAmount = dto.DiscountAmount,
+            Subtotal = dto.Quantity * dto.UnitPrice,
+            TotalPrice = Math.Max(0m, (dto.Quantity * dto.UnitPrice) - dto.DiscountAmount)
         };
         await _saleItemRepository.AddAsync(item);
         await _unitOfWork.SaveChangesAsync();
@@ -50,11 +51,11 @@ public class SaleItemService : ISaleItemService
         var item = await _saleItemRepository.GetByIdAsync(dto.Id)
             ?? throw new KeyNotFoundException($"SaleItem with ID {dto.Id} not found.");
 
-        item.SaleId = dto.SaleId;
         item.ProductId = dto.ProductId;
         item.Quantity = dto.Quantity;
         item.UnitPrice = dto.UnitPrice;
-        item.TotalPrice = dto.Quantity * dto.UnitPrice;
+        item.Subtotal = dto.Quantity * dto.UnitPrice;
+        item.TotalPrice = Math.Max(0m, item.Subtotal - item.DiscountAmount);
 
         await _saleItemRepository.UpdateAsync(item);
         await _unitOfWork.SaveChangesAsync();
@@ -75,8 +76,12 @@ public class SaleItemService : ISaleItemService
         Id = s.Id,
         SaleId = s.SaleId,
         ProductId = s.ProductId,
+        ProductName = s.ProductName,
+        SKU = s.SKU,
         Quantity = s.Quantity,
         UnitPrice = s.UnitPrice,
+        DiscountAmount = s.DiscountAmount,
+        Subtotal = s.Subtotal,
         TotalPrice = s.TotalPrice
     };
 }
