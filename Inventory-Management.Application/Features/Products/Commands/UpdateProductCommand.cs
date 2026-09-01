@@ -2,6 +2,7 @@ using Inventory_Management.Application.DTOs.Product;
 using Inventory_Management.Application.Interfaces.Repositories;
 using Inventory_Management.Domain.Entities;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Inventory_Management.Application.Features.Products.Commands;
 
@@ -24,18 +25,28 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         var product = await _productRepository.GetByIdAsync(dto.Id)
             ?? throw new KeyNotFoundException($"Product with ID {dto.Id} not found.");
 
+        if (string.IsNullOrWhiteSpace(dto.SKU))
+            throw new ArgumentException("SKU is required.");
+
+        var sku = dto.SKU.Trim();
+        var skuTaken = await _productRepository.Query()
+            .AnyAsync(p => p.Id != dto.Id && p.SKU == sku, cancellationToken);
+        if (skuTaken)
+            throw new ArgumentException($"A product with SKU '{sku}' already exists.");
+
         product.Name = dto.Name;
-        product.SKU = dto.SKU;
+        product.SKU = sku;
         product.Description = dto.Description;
         product.Price = dto.Price;
         product.Cost = dto.Cost;
-        product.QuantityInStock = dto.QuantityInStock;
+        product.MinimumStock = Math.Max(0, dto.MinimumStock);
+        product.IsActive = dto.IsActive;
         product.CategoryId = dto.CategoryId;
         product.SupplierId = dto.SupplierId;
         product.UpdatedAt = DateTime.UtcNow;
 
         await _productRepository.UpdateAsync(product);
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new ProductDto
         {
@@ -46,6 +57,8 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             Price = product.Price,
             Cost = product.Cost,
             QuantityInStock = product.QuantityInStock,
+            MinimumStock = product.MinimumStock,
+            IsActive = product.IsActive,
             CategoryId = product.CategoryId,
             SupplierId = product.SupplierId,
             CreatedAt = product.CreatedAt,

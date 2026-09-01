@@ -63,8 +63,15 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<ProductDto>> Create([FromBody] CreateProductDto dto, CancellationToken cancellationToken = default)
     {
-        var created = await _sender.Send(new CreateProductCommand(dto), cancellationToken);
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        try
+        {
+            var created = await _sender.Send(new CreateProductCommand(dto), cancellationToken);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPut("{id:guid}")]
@@ -79,8 +86,19 @@ public class ProductsController : ControllerBase
         if (id != dto.Id)
             return BadRequest("ID in URL does not match ID in request body.");
 
-        var updated = await _sender.Send(new UpdateProductCommand(dto), cancellationToken);
-        return Ok(updated);
+        try
+        {
+            var updated = await _sender.Send(new UpdateProductCommand(dto), cancellationToken);
+            return Ok(updated);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     [HttpDelete("{id:guid}")]

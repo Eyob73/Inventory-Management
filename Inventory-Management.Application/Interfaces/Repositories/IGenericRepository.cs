@@ -15,4 +15,5 @@ public interface IGenericRepository<T> where T : class
     Task UpdateAsync(T entity);
     Task DeleteAsync(Guid id);
     Task SoftDeleteAsync(Guid id);
+    IQueryable<T> Query();
 }

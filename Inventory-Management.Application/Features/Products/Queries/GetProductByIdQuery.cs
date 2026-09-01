@@ -30,6 +30,8 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, P
             Price = p.Price,
             Cost = p.Cost,
             QuantityInStock = p.QuantityInStock,
+            MinimumStock = p.MinimumStock,
+            IsActive = p.IsActive,
             CategoryId = p.CategoryId,
             SupplierId = p.SupplierId,
             CreatedAt = p.CreatedAt,

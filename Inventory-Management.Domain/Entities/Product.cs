@@ -12,6 +12,8 @@ public class Product : IMultiTenant, ISoftDelete
     public decimal Price { get; set; }
     public decimal Cost { get; set; }
     public int QuantityInStock { get; set; }
+    public int MinimumStock { get; set; }
+    public bool IsActive { get; set; } = true;
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -22,4 +24,7 @@ public class Product : IMultiTenant, ISoftDelete
 
     public Guid? SupplierId { get; set; }
     public Supplier? Supplier { get; set; }
+
+    public ICollection<PurchaseItem> PurchaseItems { get; set; } = new List<PurchaseItem>();
+    public ICollection<InventoryTransaction> InventoryTransactions { get; set; } = new List<InventoryTransaction>();
 }

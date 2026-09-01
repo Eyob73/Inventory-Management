@@ -17,6 +17,10 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.HasIndex(s => s.SaleNumber)
             .IsUnique();
 
+        builder.HasIndex(s => s.SaleDate);
+        builder.HasIndex(s => s.Status);
+        builder.HasIndex(s => s.CustomerId);
+
         builder.Property(s => s.Subtotal)
             .HasColumnType("numeric(18,2)");
 

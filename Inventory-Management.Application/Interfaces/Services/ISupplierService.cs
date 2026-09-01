@@ -4,7 +4,7 @@ namespace Inventory_Management.Application.Interfaces.Services;
 
 public interface ISupplierService
 {
-    Task<SupplierDto> GetByIdAsync(Guid id);
+    Task<SupplierDetailDto> GetByIdAsync(Guid id);
     Task<IEnumerable<SupplierDto>> GetAllAsync();
     Task<SupplierDto> AddAsync(CreateSupplierDto dto);
     Task<SupplierDto> UpdateAsync(UpdateSupplierDto dto);

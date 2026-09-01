@@ -28,6 +28,7 @@ public class AppDbContext : IdentityDbContext<AppUser>
     public DbSet<Sale> Sales { get; set; }
     public DbSet<SaleItem> SaleItems { get; set; }
     public DbSet<Supplier> Suppliers { get; set; }
+    public DbSet<InventoryTransaction> InventoryTransactions { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

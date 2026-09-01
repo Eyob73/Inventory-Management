@@ -37,5 +37,8 @@ public class SaleItemConfiguration : IEntityTypeConfiguration<SaleItem>
             .WithMany()
             .HasForeignKey(si => si.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(si => si.ProductId);
+        builder.HasIndex(si => si.SaleId);
     }
 }

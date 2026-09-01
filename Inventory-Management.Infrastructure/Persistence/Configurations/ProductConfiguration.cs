@@ -10,6 +10,11 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
     {
         builder.HasKey(p => p.Id);
 
+        builder.Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
         builder.Property(p => p.Name)
             .IsRequired()
             .HasMaxLength(200);
@@ -21,6 +26,9 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(p => p.SKU)
             .IsUnique();
 
+        builder.HasIndex(p => p.CategoryId);
+        builder.HasIndex(p => p.SupplierId);
+
         builder.Property(p => p.Description)
             .HasMaxLength(1000);
 
@@ -29,6 +37,12 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
 
         builder.Property(p => p.Cost)
             .HasColumnType("numeric(18,2)");
+
+        builder.Property(p => p.MinimumStock)
+            .HasDefaultValue(0);
+
+        builder.Property(p => p.IsActive)
+            .HasDefaultValue(true);
 
         builder.HasOne(p => p.Category)
             .WithMany(c => c.Products)

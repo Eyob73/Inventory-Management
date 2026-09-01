@@ -1,10 +1,12 @@
 using Inventory_Management.Application.DTOs.Supplier;
 using Inventory_Management.Application.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Inventory_Management.Api.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 [Tags("Suppliers")]
@@ -20,8 +22,8 @@ public class SuppliersController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = "Admin,Manager,Sales")]
     [EndpointSummary("Retrieve all suppliers")]
-    [EndpointDescription("Fetches a complete list of all active suppliers in the system.")]
     [ProducesResponseType(typeof(IEnumerable<SupplierDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<SupplierDto>>> GetAll()
     {
@@ -30,30 +32,44 @@ public class SuppliersController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
+    [Authorize(Roles = "Admin,Manager,Sales")]
     [EndpointSummary("Retrieve a supplier by ID")]
-    [EndpointDescription("Fetches contact and profile details of a specific supplier by ID.")]
-    [ProducesResponseType(typeof(SupplierDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(SupplierDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<SupplierDto>> GetById(Guid id)
+    public async Task<ActionResult<SupplierDetailDto>> GetById(Guid id)
     {
-        var supplier = await _supplierService.GetByIdAsync(id);
-        return Ok(supplier);
+        try
+        {
+            var supplier = await _supplierService.GetByIdAsync(id);
+            return Ok(supplier);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin,Manager")]
     [EndpointSummary("Create a new supplier")]
-    [EndpointDescription("Registers a new vendor/supplier in the system.")]
     [ProducesResponseType(typeof(SupplierDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<SupplierDto>> Create([FromBody] CreateSupplierDto dto)
     {
-        var created = await _supplierService.AddAsync(dto);
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        try
+        {
+            var created = await _supplierService.AddAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Admin,Manager")]
     [EndpointSummary("Update an existing supplier")]
-    [EndpointDescription("Updates contact, phone, email, or address information for a supplier.")]
     [ProducesResponseType(typeof(SupplierDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -62,18 +78,41 @@ public class SuppliersController : ControllerBase
         if (id != dto.Id)
             return BadRequest("ID in URL does not match ID in request body.");
 
-        var updated = await _supplierService.UpdateAsync(dto);
-        return Ok(updated);
+        try
+        {
+            var updated = await _supplierService.UpdateAsync(dto);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin")]
     [EndpointSummary("Delete a supplier")]
-    [EndpointDescription("Removes a supplier record from the system by ID.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        await _supplierService.DeleteAsync(id);
-        return NoContent();
+        try
+        {
+            await _supplierService.DeleteAsync(id);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 }

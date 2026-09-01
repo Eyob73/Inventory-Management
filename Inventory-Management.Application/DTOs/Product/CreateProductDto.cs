@@ -8,6 +8,8 @@ public class CreateProductDto
     public decimal Price { get; set; }
     public decimal Cost { get; set; }
     public int QuantityInStock { get; set; }
+    public int MinimumStock { get; set; }
+    public bool IsActive { get; set; } = true;
     public Guid CategoryId { get; set; }
     public Guid? SupplierId { get; set; }
 }

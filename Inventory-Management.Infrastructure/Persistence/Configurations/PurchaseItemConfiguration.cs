@@ -22,8 +22,11 @@ public class PurchaseItemConfiguration : IEntityTypeConfiguration<PurchaseItem>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(pi => pi.Product)
-            .WithMany()
+            .WithMany(p => p.PurchaseItems)
             .HasForeignKey(pi => pi.ProductId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(pi => pi.ProductId);
+        builder.HasIndex(pi => pi.PurchaseId);
     }
 }

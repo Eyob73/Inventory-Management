@@ -18,11 +18,18 @@ public class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
             .HasMaxLength(150);
 
         builder.Property(s => s.Email)
-            .IsRequired()
             .HasMaxLength(200);
 
         builder.HasIndex(s => s.Email)
-            .IsUnique();
+            .IsUnique()
+            .HasFilter("\"Email\" IS NOT NULL AND \"Email\" <> ''");
+
+        builder.HasIndex(s => s.PhoneNumber)
+            .IsUnique()
+            .HasFilter("\"PhoneNumber\" IS NOT NULL AND \"PhoneNumber\" <> ''");
+
+        builder.Property(s => s.IsActive)
+            .HasDefaultValue(true);
 
         builder.Property(s => s.PhoneNumber)
             .HasMaxLength(20);

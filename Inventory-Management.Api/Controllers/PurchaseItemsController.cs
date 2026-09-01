@@ -1,10 +1,12 @@
 using Inventory_Management.Application.DTOs.PurchaseItem;
 using Inventory_Management.Application.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Inventory_Management.Api.Controllers;
 
+[Authorize(Roles = "Admin,Manager")]
 [ApiController]
 [Route("api/[controller]")]
 [Tags("Purchase Items")]
