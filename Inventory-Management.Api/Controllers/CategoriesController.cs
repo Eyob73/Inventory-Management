@@ -31,13 +31,20 @@ public class CategoriesController : ControllerBase
 
     [HttpGet("{id:guid}")]
     [EndpointSummary("Retrieve a category by ID")]
-    [EndpointDescription("Fetches detailed information about a specific product category using its unique identifier.")]
-    [ProducesResponseType(typeof(CategoryDto), StatusCodes.Status200OK)]
+    [EndpointDescription("Fetches detailed information about a specific product category using its unique identifier, including its assigned products.")]
+    [ProducesResponseType(typeof(CategoryDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<CategoryDto>> GetById(Guid id)
+    public async Task<ActionResult<CategoryDetailDto>> GetById(Guid id)
     {
-        var category = await _categoryService.GetByIdAsync(id);
-        return Ok(category);
+        try
+        {
+            var category = await _categoryService.GetByIdAsync(id);
+            return Ok(category);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { detail = ex.Message });
+        }
     }
 
     [HttpPost]
@@ -47,8 +54,15 @@ public class CategoriesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<CategoryDto>> Create([FromBody] CreateCategoryDto dto)
     {
-        var created = await _categoryService.AddAsync(dto);
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        try
+        {
+            var created = await _categoryService.AddAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
+        {
+            return BadRequest(new { detail = ex.Message });
+        }
     }
 
     [HttpPut("{id:guid}")]
@@ -60,20 +74,43 @@ public class CategoriesController : ControllerBase
     public async Task<ActionResult<CategoryDto>> Update(Guid id, [FromBody] UpdateCategoryDto dto)
     {
         if (id != dto.Id)
-            return BadRequest("ID in URL does not match ID in request body.");
+            return BadRequest(new { detail = "ID in URL does not match ID in request body." });
 
-        var updated = await _categoryService.UpdateAsync(dto);
-        return Ok(updated);
+        try
+        {
+            var updated = await _categoryService.UpdateAsync(dto);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { detail = ex.Message });
+        }
+        catch (Exception ex) when (ex is ArgumentException || ex is InvalidOperationException)
+        {
+            return BadRequest(new { detail = ex.Message });
+        }
     }
 
     [HttpDelete("{id:guid}")]
     [EndpointSummary("Delete a category")]
     [EndpointDescription("Removes a product category from the system using its unique identifier.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        await _categoryService.DeleteAsync(id);
-        return NoContent();
+        try
+        {
+            await _categoryService.DeleteAsync(id);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { detail = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { detail = ex.Message });
+        }
     }
 }

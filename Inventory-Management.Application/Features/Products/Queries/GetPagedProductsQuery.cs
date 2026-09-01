@@ -23,12 +23,28 @@ public class GetPagedProductsQueryHandler : IRequestHandler<GetPagedProductsQuer
         var request = query.Request;
 
         Expression<Func<Product, bool>>? predicate = null;
-        if (!string.IsNullOrWhiteSpace(request.Search))
+        var search = request.Search?.Trim().ToLower();
+        var hasSearch = !string.IsNullOrWhiteSpace(search);
+        var hasCategory = request.CategoryId.HasValue && request.CategoryId.Value != Guid.Empty;
+
+        if (hasSearch && hasCategory)
         {
-            var search = request.Search.ToLower();
-            predicate = p => p.Name.ToLower().Contains(search)
-                          || p.SKU.ToLower().Contains(search)
-                          || (p.Description != null && p.Description.ToLower().Contains(search));
+            var catId = request.CategoryId!.Value;
+            predicate = p => (p.Name.ToLower().Contains(search!)
+                           || p.SKU.ToLower().Contains(search!)
+                           || (p.Description != null && p.Description.ToLower().Contains(search!)))
+                          && p.CategoryId == catId;
+        }
+        else if (hasSearch)
+        {
+            predicate = p => p.Name.ToLower().Contains(search!)
+                           || p.SKU.ToLower().Contains(search!)
+                           || (p.Description != null && p.Description.ToLower().Contains(search!));
+        }
+        else if (hasCategory)
+        {
+            var catId = request.CategoryId!.Value;
+            predicate = p => p.CategoryId == catId;
         }
 
         Func<IQueryable<Product>, IOrderedQueryable<Product>>? orderBy = request.OrderBy switch
