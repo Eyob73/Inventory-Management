@@ -31,13 +31,20 @@ public class CustomersController : ControllerBase
 
     [HttpGet("{id:guid}")]
     [EndpointSummary("Retrieve a customer by ID")]
-    [EndpointDescription("Fetches detailed information about a specific customer using their unique identifier.")]
-    [ProducesResponseType(typeof(CustomerDto), StatusCodes.Status200OK)]
+    [EndpointDescription("Fetches detailed information about a specific customer, including purchase and sales history.")]
+    [ProducesResponseType(typeof(CustomerDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<CustomerDto>> GetById(Guid id)
+    public async Task<ActionResult<CustomerDetailDto>> GetById(Guid id)
     {
-        var customer = await _customerService.GetByIdAsync(id);
-        return Ok(customer);
+        try
+        {
+            var customer = await _customerService.GetByIdAsync(id);
+            return Ok(customer);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     [HttpPost]
@@ -47,8 +54,15 @@ public class CustomersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<CustomerDto>> Create([FromBody] CreateCustomerDto dto)
     {
-        var created = await _customerService.AddAsync(dto);
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        try
+        {
+            var created = await _customerService.AddAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPut("{id:guid}")]
@@ -62,18 +76,41 @@ public class CustomersController : ControllerBase
         if (id != dto.Id)
             return BadRequest("ID in URL does not match ID in request body.");
 
-        var updated = await _customerService.UpdateAsync(dto);
-        return Ok(updated);
+        try
+        {
+            var updated = await _customerService.UpdateAsync(dto);
+            return Ok(updated);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpDelete("{id:guid}")]
     [EndpointSummary("Delete a customer")]
-    [EndpointDescription("Removes a customer record from the system using their unique identifier.")]
+    [EndpointDescription("Removes a customer record from the system if no sales records are attached.")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        await _customerService.DeleteAsync(id);
-        return NoContent();
+        try
+        {
+            await _customerService.DeleteAsync(id);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 }
