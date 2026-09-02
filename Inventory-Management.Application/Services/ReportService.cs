@@ -428,13 +428,13 @@ public class ReportService : IReportService
             };
         }).ToList();
 
-        var ordered = filter.SortBy?.ToLowerInvariant() switch
+        var ordered = (filter.SortBy?.ToLowerInvariant() switch
         {
             "name" => filter.Descending ? rows.OrderByDescending(r => r.CustomerName) : rows.OrderBy(r => r.CustomerName),
             "count" => filter.Descending ? rows.OrderByDescending(r => r.NumberOfPurchases) : rows.OrderBy(r => r.NumberOfPurchases),
             "last" => filter.Descending ? rows.OrderByDescending(r => r.LastPurchaseDate) : rows.OrderBy(r => r.LastPurchaseDate),
             _ => filter.Descending ? rows.OrderByDescending(r => r.TotalAmountSpent) : rows.OrderBy(r => r.TotalAmountSpent)
-        }.ToList();
+        }).ToList();
 
         return new CustomerReportDto
         {
@@ -500,12 +500,12 @@ public class ReportService : IReportService
             };
         }).ToList();
 
-        var ordered = filter.SortBy?.ToLowerInvariant() switch
+        var ordered = (filter.SortBy?.ToLowerInvariant() switch
         {
             "name" => filter.Descending ? rows.OrderByDescending(r => r.SupplierName) : rows.OrderBy(r => r.SupplierName),
             "count" => filter.Descending ? rows.OrderByDescending(r => r.NumberOfPurchases) : rows.OrderBy(r => r.NumberOfPurchases),
             _ => filter.Descending ? rows.OrderByDescending(r => r.TotalPurchaseAmount) : rows.OrderBy(r => r.TotalPurchaseAmount)
-        }.ToList();
+        }).ToList();
 
         var historyQuery = _purchases.Query().AsNoTracking()
             .Include(p => p.PurchaseItems)
