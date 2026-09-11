@@ -1,5 +1,6 @@
 using Inventory_Management.Application.DTOs.Product;
 using Inventory_Management.Application.Interfaces.Repositories;
+using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -12,11 +13,13 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
 {
     private readonly IGenericRepository<Product> _productRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IFileStorageService _fileStorageService;
 
-    public UpdateProductCommandHandler(IGenericRepository<Product> productRepository, IUnitOfWork unitOfWork)
+    public UpdateProductCommandHandler(IGenericRepository<Product> productRepository, IUnitOfWork unitOfWork, IFileStorageService fileStorageService)
     {
         _productRepository = productRepository;
         _unitOfWork = unitOfWork;
+        _fileStorageService = fileStorageService;
     }
 
     public async Task<ProductDto> Handle(UpdateProductCommand command, CancellationToken cancellationToken)
@@ -24,6 +27,9 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         var dto = command.Dto;
         var product = await _productRepository.GetByIdAsync(dto.Id)
             ?? throw new KeyNotFoundException($"Product with ID {dto.Id} not found.");
+
+        if (string.IsNullOrWhiteSpace(dto.Name))
+            throw new ArgumentException("Name is required.");
 
         if (string.IsNullOrWhiteSpace(dto.SKU))
             throw new ArgumentException("SKU is required.");
@@ -34,9 +40,19 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         if (skuTaken)
             throw new ArgumentException($"A product with SKU '{sku}' already exists.");
 
+        if (dto.Image != null)
+        {
+            product.ImageUrl = await _fileStorageService.SaveProductImageAsync(dto.Image, product.ImageUrl);
+        }
+        else if (dto.RemoveImage && !string.IsNullOrEmpty(product.ImageUrl))
+        {
+            _fileStorageService.DeleteProductImage(product.ImageUrl);
+            product.ImageUrl = null;
+        }
+
         product.Name = dto.Name;
         product.SKU = sku;
-        product.Description = dto.Description;
+        product.Description = dto.Description ?? string.Empty;
         product.Price = dto.Price;
         product.Cost = dto.Cost;
         product.MinimumStock = Math.Max(0, dto.MinimumStock);
@@ -54,6 +70,7 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             Name = product.Name,
             SKU = product.SKU,
             Description = product.Description,
+            ImageUrl = product.ImageUrl,
             Price = product.Price,
             Cost = product.Cost,
             QuantityInStock = product.QuantityInStock,

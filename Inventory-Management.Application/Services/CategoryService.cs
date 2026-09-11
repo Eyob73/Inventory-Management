@@ -36,6 +36,7 @@ public class CategoryService : ICategoryService
                 Name = p.Name,
                 SKU = p.SKU,
                 Description = p.Description,
+                ImageUrl = p.ImageUrl,
                 Price = p.Price,
                 Cost = p.Cost,
                 QuantityInStock = p.QuantityInStock,

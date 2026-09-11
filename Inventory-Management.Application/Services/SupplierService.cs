@@ -47,6 +47,7 @@ public class SupplierService : ISupplierService
                 ProductId = g.Key,
                 ProductName = g.First().Product?.Name ?? string.Empty,
                 SKU = g.First().Product?.SKU ?? string.Empty,
+                ImageUrl = g.First().Product?.ImageUrl,
                 TotalQuantity = g.Sum(i => i.Quantity)
             })
             .OrderByDescending(p => p.TotalQuantity)

@@ -1,10 +1,13 @@
+using Microsoft.AspNetCore.Http;
+
 namespace Inventory_Management.Application.DTOs.Product;
 
 public class CreateProductDto
 {
-    public string Name { get; set; } = string.Empty;
-    public string SKU { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
+    public string? Name { get; set; }
+    public string? SKU { get; set; }
+    public string? Description { get; set; }
+    public IFormFile? Image { get; set; }
     public decimal Price { get; set; }
     public decimal Cost { get; set; }
     public int QuantityInStock { get; set; }

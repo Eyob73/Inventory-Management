@@ -1,5 +1,6 @@
 using Inventory_Management.Application.DTOs.Product;
 using Inventory_Management.Application.Interfaces.Repositories;
+using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Domain.Entities;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -12,16 +13,21 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
 {
     private readonly IGenericRepository<Product> _productRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IFileStorageService _fileStorageService;
 
-    public CreateProductCommandHandler(IGenericRepository<Product> productRepository, IUnitOfWork unitOfWork)
+    public CreateProductCommandHandler(IGenericRepository<Product> productRepository, IUnitOfWork unitOfWork, IFileStorageService fileStorageService)
     {
         _productRepository = productRepository;
         _unitOfWork = unitOfWork;
+        _fileStorageService = fileStorageService;
     }
 
     public async Task<ProductDto> Handle(CreateProductCommand command, CancellationToken cancellationToken)
     {
         var dto = command.Dto;
+        if (string.IsNullOrWhiteSpace(dto.Name))
+            throw new ArgumentException("Name is required.");
+
         if (string.IsNullOrWhiteSpace(dto.SKU))
             throw new ArgumentException("SKU is required.");
 
@@ -30,12 +36,19 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         if (skuTaken)
             throw new ArgumentException($"A product with SKU '{sku}' already exists.");
 
+        string? imageUrl = null;
+        if (dto.Image != null)
+        {
+            imageUrl = await _fileStorageService.SaveProductImageAsync(dto.Image);
+        }
+
         var product = new Product
         {
             Id = Guid.NewGuid(),
             Name = dto.Name,
             SKU = sku,
-            Description = dto.Description,
+            Description = dto.Description ?? string.Empty,
+            ImageUrl = imageUrl,
             Price = dto.Price,
             Cost = dto.Cost,
             QuantityInStock = 0,
@@ -58,6 +71,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         Name = p.Name,
         SKU = p.SKU,
         Description = p.Description,
+        ImageUrl = p.ImageUrl,
         Price = p.Price,
         Cost = p.Cost,
         QuantityInStock = p.QuantityInStock,

@@ -61,7 +61,7 @@ public class ProductsController : ControllerBase
     [EndpointDescription("Adds a new product item to the inventory catalog.")]
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<ProductDto>> Create([FromBody] CreateProductDto dto, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<ProductDto>> Create([FromForm] CreateProductDto dto, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -81,7 +81,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<ProductDto>> Update(Guid id, [FromBody] UpdateProductDto dto, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<ProductDto>> Update(Guid id, [FromForm] UpdateProductDto dto, CancellationToken cancellationToken = default)
     {
         if (id != dto.Id)
             return BadRequest("ID in URL does not match ID in request body.");
