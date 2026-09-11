@@ -46,14 +46,6 @@ public class AuthController : ControllerBase
         {
             var (accessToken, refreshToken) = await _authService.LoginAsync(request);
 
-            Response.Cookies.Append("ims_auth", accessToken, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = !_env.IsDevelopment(),
-                SameSite = SameSiteMode.Strict,
-                Expires = DateTimeOffset.UtcNow.AddMinutes(15)
-            });
-
             Response.Cookies.Append("ims_refresh", refreshToken, new CookieOptions
             {
                 HttpOnly = true,
@@ -62,7 +54,7 @@ public class AuthController : ControllerBase
                 Expires = DateTimeOffset.UtcNow.AddDays(7)
             });
 
-            return Ok(new { message = "Login successful." });
+            return Ok(new { message = "Login successful.", accessToken });
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("locked"))
         {
@@ -80,35 +72,9 @@ public class AuthController : ControllerBase
         var refreshToken = Request.Cookies["ims_refresh"];
         await _authService.LogoutAsync(refreshToken);
 
-        Response.Cookies.Delete("ims_auth");
         Response.Cookies.Delete("ims_refresh");
 
         return Ok(new { message = "Logout successful." });
-    }
-
-    [HttpGet("me")]
-    [Authorize]
-    public async Task<IActionResult> Me([FromServices] UserManager<AppUser> userManager)
-    {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId))
-            return Unauthorized();
-
-        var user = await userManager.FindByIdAsync(userId);
-        if (user == null)
-            return NotFound(new { detail = "User not found." });
-
-        var role = await userManager.GetRolesAsync(user);
-
-        return Ok(new
-        {
-            id = user.Id,
-            email = user.Email,
-            userName = user.UserName,
-            firstName = user.FirstName,
-            lastName = user.LastName,
-            roles = role
-        });
     }
 
     [HttpPost("refresh")]
@@ -116,8 +82,23 @@ public class AuthController : ControllerBase
     {
         try
         {
-            var (accessToken, refreshToken) = await _authService.RefreshAsync(request.RefreshToken);
-            return Ok(new { accessToken, refreshToken });
+            var tokenToRefresh = string.IsNullOrEmpty(request.RefreshToken) ? Request.Cookies["ims_refresh"] : request.RefreshToken;
+            if (string.IsNullOrEmpty(tokenToRefresh))
+            {
+                return Unauthorized(new { message = "Refresh token is missing." });
+            }
+
+            var (accessToken, refreshToken) = await _authService.RefreshAsync(tokenToRefresh);
+
+            Response.Cookies.Append("ims_refresh", refreshToken, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = !_env.IsDevelopment(),
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddDays(7)
+            });
+
+            return Ok(new { accessToken });
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("theft"))
         {
