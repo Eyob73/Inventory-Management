@@ -30,6 +30,7 @@ public class AppDbContext : IdentityDbContext<AppUser>
     public DbSet<Supplier> Suppliers { get; set; }
     public DbSet<InventoryTransaction> InventoryTransactions { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

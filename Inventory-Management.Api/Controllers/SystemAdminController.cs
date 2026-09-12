@@ -1,3 +1,4 @@
+using Inventory_Management.Application.DTOs.Common;
 using Inventory_Management.Application.DTOs.Tenant;
 using Inventory_Management.Application.Features.SystemAdmin.Commands;
 using Inventory_Management.Application.Features.SystemAdmin.Queries;
@@ -36,6 +37,13 @@ public class SystemAdminController : ControllerBase
     public async Task<ActionResult<IEnumerable<TenantDto>>> GetAllTenants(CancellationToken cancellationToken = default)
     {
         var tenants = await _sender.Send(new GetAllTenantsQuery(), cancellationToken);
+        return Ok(tenants);
+    }
+
+    [HttpGet("tenants/paged")]
+    public async Task<ActionResult<PagedResponse<TenantDto>>> GetPagedTenants([FromQuery] PagedRequest request, CancellationToken cancellationToken = default)
+    {
+        var tenants = await _sender.Send(new GetPagedTenantsQuery(request), cancellationToken);
         return Ok(tenants);
     }
 

@@ -46,7 +46,7 @@ public class CreateTenantWithAdminCommandHandler : IRequestHandler<CreateTenantW
             dto.AdminPassword,
             dto.AdminFirstName,
             dto.AdminLastName,
-            "CompanyAdmin",
+            "Admin",
             tenant.Id
         );
 

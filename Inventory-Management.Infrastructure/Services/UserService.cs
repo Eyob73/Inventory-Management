@@ -33,12 +33,24 @@ public class UserService : IUserService
         return userDtos;
     }
 
-    public async Task<PagedResponse<UserDto>> GetPagedAsync(int page, int pageSize, string? search, CancellationToken cancellationToken = default)
+    public async Task<PagedResponse<UserDto>> GetPagedAsync(int page, int pageSize, string? search, string? tenantId, string? orderBy, bool descending, CancellationToken cancellationToken = default)
     {
         page = page < 1 ? 1 : page;
         pageSize = pageSize < 1 ? 10 : pageSize > 50 ? 50 : pageSize;
 
         var query = _userManager.Users.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(tenantId))
+        {
+            if (tenantId.ToLower() == "system")
+            {
+                query = query.Where(u => u.TenantId == null);
+            }
+            else if (Guid.TryParse(tenantId, out var parsedTenantId))
+            {
+                query = query.Where(u => u.TenantId == parsedTenantId);
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -49,10 +61,17 @@ public class UserService : IUserService
                 (u.Email != null && u.Email.ToLower().Contains(lower)) ||
                 (u.UserName != null && u.UserName.ToLower().Contains(lower)));
         }
+        
+        var sort = orderBy?.ToLower() ?? "name";
+        query = sort switch
+        {
+            "name" => descending ? query.OrderByDescending(u => u.FirstName ?? u.UserName ?? u.Email) : query.OrderBy(u => u.FirstName ?? u.UserName ?? u.Email),
+            "email" => descending ? query.OrderByDescending(u => u.Email) : query.OrderBy(u => u.Email),
+            _ => descending ? query.OrderByDescending(u => u.FirstName ?? u.UserName ?? u.Email) : query.OrderBy(u => u.FirstName ?? u.UserName ?? u.Email)
+        };
 
         var totalCount = await query.CountAsync(cancellationToken);
         var pagedUsers = await query
-            .OrderBy(u => u.FirstName ?? u.UserName ?? u.Email)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);

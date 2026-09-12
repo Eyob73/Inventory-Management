@@ -60,6 +60,10 @@ public class AuthController : ControllerBase
         {
             return StatusCode(423, new { detail = ex.Message });
         }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("suspended") || ex.Message.Contains("deactivated"))
+        {
+            return StatusCode(403, new { detail = ex.Message });
+        }
         catch (InvalidOperationException)
         {
             return Unauthorized(new { detail = "Invalid credentials." });
@@ -73,6 +77,8 @@ public class AuthController : ControllerBase
         await _authService.LogoutAsync(refreshToken);
 
         Response.Cookies.Delete("ims_refresh");
+        Response.Cookies.Delete("ims_auth");
+        Response.Cookies.Delete("XSRF-TOKEN");
 
         return Ok(new { message = "Logout successful." });
     }

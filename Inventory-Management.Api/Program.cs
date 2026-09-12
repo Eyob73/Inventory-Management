@@ -65,6 +65,9 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<INotificationDispatcher, Inventory_Management.Api.Services.SignalRNotificationDispatcher>();
+builder.Services.AddSignalR();
 
 builder.Services.AddIdentityCore<AppUser>(options =>
 {
@@ -104,7 +107,13 @@ builder.Services.AddAuthentication(options =>
     {
         OnMessageReceived = context =>
         {
-            if (context.Request.Cookies.TryGetValue("ims_auth", out var token))
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/notifications"))
+            {
+                context.Token = accessToken;
+            }
+            else if (context.Request.Cookies.TryGetValue("ims_auth", out var token))
             {
                 context.Token = token;
             }
@@ -211,6 +220,7 @@ app.Use(async (context, next) =>
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<Inventory_Management.Api.Hubs.NotificationHub>("/hubs/notifications");
 
 app.MapGet("/api/error", () =>
 {

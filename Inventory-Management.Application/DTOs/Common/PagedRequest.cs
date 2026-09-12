@@ -27,6 +27,7 @@ public record PagedRequest
 
     public string? Search { get; init; }
     public Guid? CategoryId { get; init; }
+    public int? Status { get; init; }
     public string OrderBy { get; init; } = "Title";
     public bool Descending { get; init; }
 }

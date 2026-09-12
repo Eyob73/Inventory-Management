@@ -936,6 +936,8 @@ public class ReportService : IReportService
             query = query.Where(s => s.SaleItems.Any(i => i.ProductId == filter.ProductId));
         if (filter.CategoryId.HasValue)
             query = query.Where(s => s.SaleItems.Any(i => i.Product != null && i.Product.CategoryId == filter.CategoryId));
+        if (!string.IsNullOrWhiteSpace(filter.UserId))
+            query = query.Where(s => s.UserId == filter.UserId);
         return query;
     }
 
@@ -947,6 +949,8 @@ public class ReportService : IReportService
             query = query.Where(i => i.ProductId == filter.ProductId);
         if (filter.CategoryId.HasValue)
             query = query.Where(i => i.Product != null && i.Product.CategoryId == filter.CategoryId);
+        if (!string.IsNullOrWhiteSpace(filter.UserId))
+            query = query.Where(i => i.Sale != null && i.Sale.UserId == filter.UserId);
         return query;
     }
 

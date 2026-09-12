@@ -13,15 +13,18 @@ public class InventoryService : IInventoryService
     private readonly IGenericRepository<Product> _productRepository;
     private readonly IGenericRepository<InventoryTransaction> _transactionRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
 
     public InventoryService(
         IGenericRepository<Product> productRepository,
         IGenericRepository<InventoryTransaction> transactionRepository,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        INotificationService notificationService)
     {
         _productRepository = productRepository;
         _transactionRepository = transactionRepository;
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
     }
 
     public Task IncreaseStockAsync(
@@ -185,6 +188,45 @@ public class InventoryService : IInventoryService
             CreatedAt = DateTime.UtcNow,
             CreatedBy = createdBy
         });
+
+        // Notifications
+        bool becameLowStock = previous > product.MinimumStock && next <= product.MinimumStock && next > 0;
+        bool becameOutOfStock = previous > 0 && next == 0;
+
+        if (previous <= product.MinimumStock && previous > 0 && next == 0)
+        {
+            becameOutOfStock = true;
+            becameLowStock = false;
+        }
+
+        if (becameOutOfStock)
+        {
+            await _notificationService.SendToRolesAsync(
+                new[] { "Admin", "Manager" },
+                new Inventory_Management.Application.DTOs.Notification.NotificationDto
+                {
+                    Title = "Out of Stock",
+                    Message = $"{product.Name} is currently out of stock.",
+                    Type = "OutOfStock",
+                    RelatedEntityId = product.Id,
+                    RelatedEntityType = "Product",
+                    Link = $"/inventory"
+                });
+        }
+        else if (becameLowStock)
+        {
+            await _notificationService.SendToRolesAsync(
+                new[] { "Admin", "Manager" },
+                new Inventory_Management.Application.DTOs.Notification.NotificationDto
+                {
+                    Title = "Low Stock Alert",
+                    Message = $"{product.Name} is running low. Current stock: {next}.",
+                    Type = "LowStock",
+                    RelatedEntityId = product.Id,
+                    RelatedEntityType = "Product",
+                    Link = $"/inventory"
+                });
+        }
     }
 
     private static InventoryTransactionDto MapTransaction(InventoryTransaction t) => new()

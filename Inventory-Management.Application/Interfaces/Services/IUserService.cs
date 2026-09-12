@@ -6,7 +6,7 @@ namespace Inventory_Management.Application.Interfaces.Services;
 public interface IUserService
 {
     Task<IEnumerable<UserDto>> GetAllAsync(CancellationToken cancellationToken = default);
-    Task<PagedResponse<UserDto>> GetPagedAsync(int page, int pageSize, string? search, CancellationToken cancellationToken = default);
+    Task<PagedResponse<UserDto>> GetPagedAsync(int page, int pageSize, string? search, string? tenantId, string? orderBy, bool descending, CancellationToken cancellationToken = default);
     Task<UserDto?> GetByIdAsync(string id, CancellationToken cancellationToken = default);
     Task<(bool Success, UserDto? User, IEnumerable<string>? Errors)> CreateAsync(CreateUserDto dto, CancellationToken cancellationToken = default);
     Task<(bool Success, UserDto? User, IEnumerable<string>? Errors)> UpdateAsync(string id, UpdateUserDto dto, CancellationToken cancellationToken = default);

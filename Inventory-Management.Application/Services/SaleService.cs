@@ -15,19 +15,22 @@ public class SaleService : ISaleService
     private readonly IGenericRepository<Customer> _customerRepository;
     private readonly IInventoryService _inventoryService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
 
     public SaleService(
         ISaleRepository saleRepository,
         IGenericRepository<Product> productRepository,
         IGenericRepository<Customer> customerRepository,
         IInventoryService inventoryService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        INotificationService notificationService)
     {
         _saleRepository = saleRepository;
         _productRepository = productRepository;
         _customerRepository = customerRepository;
         _inventoryService = inventoryService;
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
     }
 
     public async Task<SaleDto> CreateSaleAsync(CreateSaleDto dto, string? userId, string? cashierName)
@@ -136,6 +139,21 @@ public class SaleService : ISaleService
             await _unitOfWork.SaveChangesAsync();
             created = sale;
         });
+
+        if (created != null)
+        {
+            await _notificationService.SendToRolesAsync(
+                new[] { "Admin", "Manager" },
+                new Inventory_Management.Application.DTOs.Notification.NotificationDto
+                {
+                    Title = "Sale Completed",
+                    Message = $"Sale {created.SaleNumber} was completed successfully.",
+                    Type = "NewSale",
+                    RelatedEntityId = created.Id,
+                    RelatedEntityType = "Sale",
+                    Link = $"/sales-history/{created.Id}"
+                });
+        }
 
         return MapToDto(created!);
     }

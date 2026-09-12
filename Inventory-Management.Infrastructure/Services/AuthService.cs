@@ -70,6 +70,30 @@ public class AuthService : IAuthService
             await _userManager.AccessFailedAsync(user);
             throw new InvalidOperationException("Invalid credentials.");
         }
+
+        // Check tenant status — block login if company is suspended or deactivated
+        if (user.TenantId.HasValue)
+        {
+            var tenant = await _context.Tenants
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == user.TenantId.Value);
+
+            if (tenant == null)
+            {
+                throw new InvalidOperationException("Your company account could not be found. Please contact support.");
+            }
+
+            if (tenant.Status == Domain.Enums.TenantStatus.Suspended)
+            {
+                throw new InvalidOperationException("Your company account has been suspended. Please contact the system administrator.");
+            }
+
+            if (tenant.Status == Domain.Enums.TenantStatus.Deactivated || !tenant.IsActive)
+            {
+                throw new InvalidOperationException("Your company account has been deactivated. Please contact the system administrator.");
+            }
+        }
+
         await _userManager.ResetAccessFailedCountAsync(user);
         var roles = await _userManager.GetRolesAsync(user);
         var accessToken = _tokenService.GenerateJwt(user, roles);

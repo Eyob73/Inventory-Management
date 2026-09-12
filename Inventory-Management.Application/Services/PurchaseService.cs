@@ -16,6 +16,7 @@ public class PurchaseService : IPurchaseService
     private readonly IGenericRepository<Product> _productRepository;
     private readonly IInventoryService _inventoryService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly INotificationService _notificationService;
 
     public PurchaseService(
         IPurchaseRepository purchaseRepository,
@@ -23,7 +24,8 @@ public class PurchaseService : IPurchaseService
         IGenericRepository<Supplier> supplierRepository,
         IGenericRepository<Product> productRepository,
         IInventoryService inventoryService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        INotificationService notificationService)
     {
         _purchaseRepository = purchaseRepository;
         _purchaseItemRepository = purchaseItemRepository;
@@ -31,6 +33,7 @@ public class PurchaseService : IPurchaseService
         _productRepository = productRepository;
         _inventoryService = inventoryService;
         _unitOfWork = unitOfWork;
+        _notificationService = notificationService;
     }
 
     public async Task<PurchaseDto> GetByIdAsync(Guid id)
@@ -78,6 +81,22 @@ public class PurchaseService : IPurchaseService
             await _unitOfWork.SaveChangesAsync();
             created = purchase;
         });
+
+        if (created != null)
+        {
+            var supplierName = supplier?.Name ?? "Unknown Supplier";
+            await _notificationService.SendToRolesAsync(
+                new[] { "Admin", "Manager" },
+                new Inventory_Management.Application.DTOs.Notification.NotificationDto
+                {
+                    Title = "New Purchase",
+                    Message = $"A new purchase from {supplierName} has been created.",
+                    Type = "Purchase",
+                    RelatedEntityId = created.Id,
+                    RelatedEntityType = "Purchase",
+                    Link = $"/purchases"
+                });
+        }
 
         return await GetByIdAsync(created!.Id);
     }
@@ -148,7 +167,21 @@ public class PurchaseService : IPurchaseService
             await _unitOfWork.SaveChangesAsync();
         });
 
-        return await GetByIdAsync(id);
+        var result = await GetByIdAsync(id);
+        
+        await _notificationService.SendToRolesAsync(
+            new[] { "Admin", "Manager" },
+            new Inventory_Management.Application.DTOs.Notification.NotificationDto
+            {
+                Title = "Purchase Received",
+                Message = $"Purchase {result.PurchaseNumber} has been received and inventory has been updated.",
+                Type = "Purchase",
+                RelatedEntityId = id,
+                RelatedEntityType = "Purchase",
+                Link = $"/purchases"
+            });
+
+        return result;
     }
 
     public async Task CancelAsync(Guid id, string? createdBy)

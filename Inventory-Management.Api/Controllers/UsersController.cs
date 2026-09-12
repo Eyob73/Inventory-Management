@@ -40,9 +40,12 @@ public class UsersController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null,
+        [FromQuery] string? tenantId = null,
+        [FromQuery] string? orderBy = null,
+        [FromQuery] bool descending = false,
         CancellationToken cancellationToken = default)
     {
-        var result = await _userService.GetPagedAsync(page, pageSize, search, cancellationToken);
+        var result = await _userService.GetPagedAsync(page, pageSize, search, tenantId, orderBy, descending, cancellationToken);
         return Ok(result);
     }
 
