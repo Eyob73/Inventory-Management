@@ -1,11 +1,14 @@
+using Bogus;
 using Inventory_Management.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+
+using Microsoft.AspNetCore.Identity;
 
 namespace Inventory_Management.Infrastructure.Persistence.Data;
 
 public static class DatabaseSeeder
 {
-    public static async Task SeedAsync(AppDbContext context)
+    public static async Task SeedAsync(AppDbContext context, UserManager<AppUser> userManager, RoleManager<IdentityRole> roleManager)
     {
         // Ensure database is updated to latest migration
         await context.Database.MigrateAsync();
@@ -40,77 +43,116 @@ public static class DatabaseSeeder
             techHubTenant = await context.Tenants.FindAsync(techHubTenant.Id) ?? techHubTenant;
         }
 
-        // ─── 2. Seed Categories, Suppliers, Products, Customers ───────────────
+        // ─── 2. Seed Data using Bogus ───────────────
         if (!await context.Categories.IgnoreQueryFilters().AnyAsync())
         {
-            // ── Acme's Categories
-            var electronics = new Category { Id = Guid.NewGuid(), TenantId = acmeTenant.Id, Name = "Electronics", Description = "Gadgets and electronic hardware" };
-            var furniture   = new Category { Id = Guid.NewGuid(), TenantId = acmeTenant.Id, Name = "Furniture",   Description = "Office and home furniture" };
-            var stationery  = new Category { Id = Guid.NewGuid(), TenantId = acmeTenant.Id, Name = "Stationery",  Description = "Office supplies and paper products" };
+            Randomizer.Seed = new Random(42);
 
-            // ── TechHub's Categories
-            var networking  = new Category { Id = Guid.NewGuid(), TenantId = techHubTenant.Id, Name = "Networking",  Description = "Networking hardware and accessories" };
-            var peripherals = new Category { Id = Guid.NewGuid(), TenantId = techHubTenant.Id, Name = "Peripherals", Description = "Computer peripherals" };
+            var tenants = new[] { acmeTenant, techHubTenant };
 
-            await context.Categories.AddRangeAsync(electronics, furniture, stationery, networking, peripherals);
-
-            // ── Acme's Suppliers
-            var supplierTech = new Supplier
+            foreach (var tenant in tenants)
             {
-                Id = Guid.NewGuid(), TenantId = acmeTenant.Id,
-                Name = "TechSupply Co.", ContactName = "Robert Paulson",
-                Email = "contact@techsupply.com", PhoneNumber = "+1-555-0192",
-                Address = "100 Tech Blvd, Silicon Valley, CA"
-            };
-            var supplierFurniture = new Supplier
-            {
-                Id = Guid.NewGuid(), TenantId = acmeTenant.Id,
-                Name = "Global Office Depot", ContactName = "Sarah Jenkins",
-                Email = "sales@globalofficedepot.com", PhoneNumber = "+1-555-0143",
-                Address = "450 Industrial Parkway, Chicago, IL"
-            };
+                // -- Generate Categories --
+                var categoryFaker = new Faker<Category>()
+                    .RuleFor(c => c.Id, f => Guid.NewGuid())
+                    .RuleFor(c => c.TenantId, f => tenant.Id)
+                    .RuleFor(c => c.Name, f => f.Commerce.Categories(1)[0] + " " + f.UniqueIndex)
+                    .RuleFor(c => c.Description, f => f.Commerce.ProductDescription());
 
-            // ── TechHub's Suppliers
-            var supplierNetwork = new Supplier
-            {
-                Id = Guid.NewGuid(), TenantId = techHubTenant.Id,
-                Name = "NetGear Distributors", ContactName = "Mark Chen",
-                Email = "orders@netgeardist.com", PhoneNumber = "+1-555-0377",
-                Address = "200 Data Drive, Austin, TX"
-            };
+                var categories = categoryFaker.Generate(10).GroupBy(c => c.Name).Select(g => g.First()).ToList(); // Unique names
+                await context.Categories.AddRangeAsync(categories);
 
-            await context.Suppliers.AddRangeAsync(supplierTech, supplierFurniture, supplierNetwork);
+                // -- Generate Suppliers --
+                var supplierFaker = new Faker<Supplier>()
+                    .RuleFor(s => s.Id, f => Guid.NewGuid())
+                    .RuleFor(s => s.TenantId, f => tenant.Id)
+                    .RuleFor(s => s.Name, f => f.Company.CompanyName())
+                    .RuleFor(s => s.ContactName, f => f.Name.FullName())
+                    .RuleFor(s => s.Email, f => f.Internet.Email() + f.UniqueIndex) // Ensure unique
+                    .RuleFor(s => s.PhoneNumber, f => f.Phone.PhoneNumber("###-###-####")) // Format to stay under 20
+                    .RuleFor(s => s.Address, f => { var addr = f.Address.FullAddress(); return addr.Length <= 300 ? addr : addr.Substring(0, 300); });
 
-            // ── Acme's Products
-            await context.Products.AddRangeAsync(
-                new Product { Id = Guid.NewGuid(), TenantId = acmeTenant.Id, Name = "Pro Wireless Mouse",   SKU = "ELEC-WMO-001", Description = "Ergonomic 2.4GHz Wireless Mouse",             Price = 29.99m,  Cost = 14.50m,  QuantityInStock = 150, CategoryId = electronics.Id, SupplierId = supplierTech.Id },
-                new Product { Id = Guid.NewGuid(), TenantId = acmeTenant.Id, Name = "Mechanical Keyboard",  SKU = "ELEC-MKB-002", Description = "RGB Backlit Mechanical Gaming Keyboard",        Price = 89.99m,  Cost = 45.00m,  QuantityInStock = 75,  CategoryId = electronics.Id, SupplierId = supplierTech.Id },
-                new Product { Id = Guid.NewGuid(), TenantId = acmeTenant.Id, Name = "Ergonomic Chair",      SKU = "FURN-EOC-001", Description = "High-back mesh chair with lumbar support",      Price = 249.99m, Cost = 130.00m, QuantityInStock = 30,  CategoryId = furniture.Id,   SupplierId = supplierFurniture.Id },
-                new Product { Id = Guid.NewGuid(), TenantId = acmeTenant.Id, Name = "Standing Desk",        SKU = "FURN-ASD-002", Description = "Electric dual-motor standing desk 55 inch",     Price = 499.99m, Cost = 280.00m, QuantityInStock = 15,  CategoryId = furniture.Id,   SupplierId = supplierFurniture.Id },
-                new Product { Id = Guid.NewGuid(), TenantId = acmeTenant.Id, Name = "A4 Printing Paper",    SKU = "STAT-PPR-001", Description = "500-sheet ream of 80gsm A4 printing paper",     Price = 8.99m,   Cost = 4.00m,   QuantityInStock = 500, CategoryId = stationery.Id,  SupplierId = supplierFurniture.Id }
-            );
+                var suppliers = supplierFaker.Generate(20);
+                await context.Suppliers.AddRangeAsync(suppliers);
 
-            // ── TechHub's Products
-            await context.Products.AddRangeAsync(
-                new Product { Id = Guid.NewGuid(), TenantId = techHubTenant.Id, Name = "24-Port Managed Switch", SKU = "NET-SW-001",  Description = "Gigabit 24-port managed network switch", Price = 349.99m, Cost = 180.00m, QuantityInStock = 20, CategoryId = networking.Id,  SupplierId = supplierNetwork.Id },
-                new Product { Id = Guid.NewGuid(), TenantId = techHubTenant.Id, Name = "Dual-Band Wi-Fi Router",  SKU = "NET-WR-002",  Description = "AX3000 dual-band Wi-Fi 6 router",       Price = 199.99m, Cost = 95.00m,  QuantityInStock = 40, CategoryId = networking.Id,  SupplierId = supplierNetwork.Id },
-                new Product { Id = Guid.NewGuid(), TenantId = techHubTenant.Id, Name = "USB-C Hub 7-in-1",        SKU = "PERI-USB-001", Description = "7-in-1 USB-C hub with HDMI and PD",    Price = 49.99m,  Cost = 22.00m,  QuantityInStock = 90, CategoryId = peripherals.Id, SupplierId = supplierNetwork.Id }
-            );
+                // -- Generate Products --
+                var productFaker = new Faker<Product>()
+                    .RuleFor(p => p.Id, f => Guid.NewGuid())
+                    .RuleFor(p => p.TenantId, f => tenant.Id)
+                    .RuleFor(p => p.Name, f => f.Commerce.ProductName())
+                    .RuleFor(p => p.SKU, f => f.Commerce.Ean13() + "-" + f.UniqueIndex) // Ensure unique
+                    .RuleFor(p => p.Description, f => f.Commerce.ProductDescription())
+                    .RuleFor(p => p.Cost, f => decimal.Parse(f.Commerce.Price(1, 100)))
+                    .RuleFor(p => p.Price, (f, p) => p.Cost * f.Random.Decimal(1.2m, 2.0m)) // Profit margin
+                    .RuleFor(p => p.QuantityInStock, f => f.Random.Int(0, 500))
+                    .RuleFor(p => p.CategoryId, f => f.PickRandom(categories).Id)
+                    .RuleFor(p => p.SupplierId, f => f.PickRandom(suppliers).Id);
 
-            // ── Acme's Customers
-            await context.Customers.AddRangeAsync(
-                new Customer { Id = Guid.NewGuid(), TenantId = acmeTenant.Id, Name = "Metropolis Inc.",  Email = "orders@metropolis.com",  PhoneNumber = "+1-555-0800", Address = "789 Corporate Way, New York, NY" },
-                new Customer { Id = Guid.NewGuid(), TenantId = acmeTenant.Id, Name = "John Doe",         Email = "johndoe@example.com",    PhoneNumber = "+1-555-0911", Address = "123 Main Street, Austin, TX" },
-                new Customer { Id = Guid.NewGuid(), TenantId = acmeTenant.Id, Name = "Stark Enterprises", Email = "supply@stark.com",       PhoneNumber = "+1-555-0999", Address = "10880 Malibu Point, CA" }
-            );
+                var products = productFaker.Generate(100);
+                await context.Products.AddRangeAsync(products);
 
-            // ── TechHub's Customers
-            await context.Customers.AddRangeAsync(
-                new Customer { Id = Guid.NewGuid(), TenantId = techHubTenant.Id, Name = "CloudBase Systems", Email = "info@cloudbase.io",      PhoneNumber = "+1-555-0451", Address = "77 Cloud Ave, Seattle, WA" },
-                new Customer { Id = Guid.NewGuid(), TenantId = techHubTenant.Id, Name = "DataEdge Ltd.",      Email = "purchasing@dataedge.com", PhoneNumber = "+1-555-0762", Address = "300 Data Lane, San Jose, CA" }
-            );
+                // -- Generate Customers --
+                var customerFaker = new Faker<Customer>()
+                    .RuleFor(c => c.Id, f => Guid.NewGuid())
+                    .RuleFor(c => c.TenantId, f => tenant.Id)
+                    .RuleFor(c => c.Name, f => f.Company.CompanyName())
+                    .RuleFor(c => c.Email, f => f.Internet.Email() + f.UniqueIndex) // Ensure unique
+                    .RuleFor(c => c.PhoneNumber, f => f.Phone.PhoneNumber("###-###-####")) // Format to stay under 20
+                    .RuleFor(c => c.Address, f => { var addr = f.Address.FullAddress(); return addr.Length <= 300 ? addr : addr.Substring(0, 300); });
+
+                var customers = customerFaker.Generate(50);
+                await context.Customers.AddRangeAsync(customers);
+            }
         }
 
         await context.SaveChangesAsync();
+
+        // ─── 3. Seed Roles and Users ──────────────────────────────────────────
+        string[] roles = { "SystemAdmin", "Admin", "Manager", "Sales" };
+        foreach (var role in roles)
+        {
+            if (!await roleManager.RoleExistsAsync(role))
+            {
+                await roleManager.CreateAsync(new IdentityRole(role));
+            }
+        }
+
+        // Helper function to create users
+        async Task CreateUserAsync(string email, string firstName, string lastName, string role, Guid? tenantId)
+        {
+            if (await userManager.FindByEmailAsync(email) == null)
+            {
+                var user = new AppUser
+                {
+                    UserName = email,
+                    Email = email,
+                    FirstName = firstName,
+                    LastName = lastName,
+                    TenantId = tenantId,
+                    EmailConfirmed = true
+                };
+
+                var result = await userManager.CreateAsync(user, "Password123!");
+                if (result.Succeeded)
+                {
+                    await userManager.AddToRoleAsync(user, role);
+                }
+            }
+        }
+
+        // 1. System Admin (No TenantId)
+        await CreateUserAsync("systemadmin@ims.com", "System", "Admin", "SystemAdmin", null);
+
+        // 2. Company Admins
+        await CreateUserAsync("admin@acme.com", "Acme", "Admin", "Admin", acmeTenant.Id);
+        await CreateUserAsync("admin@techhub.com", "TechHub", "Admin", "Admin", techHubTenant.Id);
+
+        // 3. Company Managers
+        await CreateUserAsync("manager@acme.com", "Acme", "Manager", "Manager", acmeTenant.Id);
+        await CreateUserAsync("manager@techhub.com", "TechHub", "Manager", "Manager", techHubTenant.Id);
+
+        // 4. Company Sales
+        await CreateUserAsync("sales@acme.com", "Acme", "Sales", "Sales", acmeTenant.Id);
+        await CreateUserAsync("sales@techhub.com", "TechHub", "Sales", "Sales", techHubTenant.Id);
     }
 }

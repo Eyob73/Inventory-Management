@@ -5,5 +5,6 @@ namespace Inventory_Management.Application.DTOs.Auth;
         string Password,
         string FirstName,
         string LastName,
-        string Role
+        string Role,
+        Guid? TenantId = null
     );

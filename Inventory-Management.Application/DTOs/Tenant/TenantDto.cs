@@ -1,3 +1,5 @@
+using Inventory_Management.Domain.Enums;
+
 namespace Inventory_Management.Application.DTOs.Tenant;
 
 public class TenantDto
@@ -6,5 +8,6 @@ public class TenantDto
     public string Name { get; set; } = string.Empty;
     public string Code { get; set; } = string.Empty;
     public bool IsActive { get; set; }
+    public TenantStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
 }

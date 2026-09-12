@@ -27,6 +27,7 @@ public class GetTenantByIdQueryHandler : IRequestHandler<GetTenantByIdQuery, Ten
             Name = t.Name,
             Code = t.Code,
             IsActive = t.IsActive,
+            Status = t.Status,
             CreatedAt = t.CreatedAt
         };
     }

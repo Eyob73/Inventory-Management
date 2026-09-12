@@ -40,6 +40,7 @@ public class AuthService : IAuthService
             Email = request.Email,
             FirstName = request.FirstName,
             LastName = request.LastName,
+            TenantId = request.TenantId
         };
         var result = await _userManager.CreateAsync(user, request.Password);
         if (!result.Succeeded)

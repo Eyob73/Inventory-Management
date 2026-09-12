@@ -26,6 +26,10 @@ public class TokenService
             new Claim("FirstName", user.FirstName),
             new Claim("LastName", user.LastName),
         };
+        if (user.TenantId.HasValue)
+        {
+            claims.Add(new Claim("TenantId", user.TenantId.Value.ToString()));
+        }
         foreach (var role in roles)
         {
             claims.Add(new Claim(ClaimTypes.Role, role));

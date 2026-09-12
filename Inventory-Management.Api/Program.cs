@@ -145,7 +145,9 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await DatabaseSeeder.SeedAsync(dbContext);
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    await DatabaseSeeder.SeedAsync(dbContext, userManager, roleManager);
 }
 
 if (app.Environment.IsDevelopment())
@@ -157,8 +159,6 @@ if (app.Environment.IsDevelopment())
 app.UseStatusCodePages();
 
 app.UseMiddleware<RequestLoggingMiddleware>();
-
-app.UseMiddleware<TenantResolverMiddleware>();
 
 app.Use(
     async (context, next) =>
@@ -188,6 +188,8 @@ app.UseRateLimiter();
 app.UseCors("AllowAngular");
 
 app.UseAuthentication();
+
+app.UseMiddleware<TenantResolverMiddleware>();
 
 app.Use(async (context, next) =>
 {

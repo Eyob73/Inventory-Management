@@ -25,6 +25,7 @@ public class GetAllTenantsQueryHandler : IRequestHandler<GetAllTenantsQuery, IEn
             Name = t.Name,
             Code = t.Code,
             IsActive = t.IsActive,
+            Status = t.Status,
             CreatedAt = t.CreatedAt
         });
     }
