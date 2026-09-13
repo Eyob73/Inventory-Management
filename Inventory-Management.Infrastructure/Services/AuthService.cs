@@ -72,6 +72,7 @@ public class AuthService : IAuthService
         }
 
         // Check tenant status — block login if company is suspended or deactivated
+        string? tenantName = null;
         if (user.TenantId.HasValue)
         {
             var tenant = await _context.Tenants
@@ -92,11 +93,13 @@ public class AuthService : IAuthService
             {
                 throw new InvalidOperationException("Your company account has been deactivated. Please contact the system administrator.");
             }
+            
+            tenantName = tenant.Name;
         }
 
         await _userManager.ResetAccessFailedCountAsync(user);
         var roles = await _userManager.GetRolesAsync(user);
-        var accessToken = _tokenService.GenerateJwt(user, roles);
+        var accessToken = _tokenService.GenerateJwt(user, roles, tenantName);
         var refreshToken = new RefreshToken
         {
             Token = Guid.NewGuid().ToString("N"),
@@ -166,7 +169,21 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync();
         var user = await _userManager.FindByIdAsync(storedToken.UserId);
         var roles = await _userManager.GetRolesAsync(user!);
-        var newAccessToken = _tokenService.GenerateJwt(user!, roles);
+
+        string? tenantName = null;
+        if (user!.TenantId.HasValue)
+        {
+            var tenant = await _context.Tenants
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == user.TenantId.Value);
+            
+            if (tenant != null)
+            {
+                tenantName = tenant.Name;
+            }
+        }
+
+        var newAccessToken = _tokenService.GenerateJwt(user, roles, tenantName);
         return (newAccessToken, newRefreshToken.Token);
     }
 }

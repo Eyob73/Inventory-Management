@@ -680,9 +680,57 @@ public class ReportService : IReportService
         };
         meta.AddRange(summary);
 
-        return fmt is "xlsx" or "excel"
-            ? BuildExcel(title, meta, headers, rows)
-            : BuildCsv(title, meta, headers, rows);
+        return fmt switch
+        {
+            "xlsx" or "excel" => BuildExcel(title, meta, headers, rows),
+            "pdf" => BuildPdf(title, meta, headers, rows),
+            _ => BuildCsv(title, meta, headers, rows)
+        };
+    }
+
+    private ReportExportFile BuildPdf(string title, List<string[]> meta, string[] headers, List<string[]> rows)
+    {
+        var bytes = PdfReportGenerator.Generate(title, meta, headers, rows);
+        return new ReportExportFile
+        {
+            FileName = $"{Slug(title)}-{DateTime.UtcNow:yyyyMMdd}.pdf",
+            ContentType = "application/pdf",
+            Content = bytes
+        };
+    }
+
+    public async Task<ReportExportFile> ExportCompositeAsync(string tenantName, string userName, ReportFilterDto filter, string format, CancellationToken cancellationToken = default)
+    {
+        filter.Page = 1;
+        filter.PageSize = 100; // Limit to keep the composite manageable
+
+        var dashboard = await GetDashboardAsync(filter, cancellationToken);
+        var sales = await GetSalesAsync(filter, cancellationToken);
+        var purchases = await GetPurchasesAsync(filter, cancellationToken);
+        var inventory = await GetInventoryAsync(filter, cancellationToken);
+
+        var (start, end) = NormalizeRange(filter);
+
+        if (format.Trim().ToLowerInvariant() is "xlsx" or "excel")
+        {
+            var bytes = CompositeExcelGenerator.Generate(tenantName, userName, start, end, dashboard, sales, purchases, inventory);
+            return new ReportExportFile
+            {
+                FileName = $"Inventory-Financial-Report-{DateTime.UtcNow:yyyyMMdd}.xls",
+                ContentType = "application/vnd.ms-excel",
+                Content = bytes
+            };
+        }
+        else
+        {
+            var bytes = CompositePdfGenerator.Generate(tenantName, userName, start, end, dashboard, sales, purchases, inventory);
+            return new ReportExportFile
+            {
+                FileName = $"Inventory-Financial-Report-{DateTime.UtcNow:yyyyMMdd}.pdf",
+                ContentType = "application/pdf",
+                Content = bytes
+            };
+        }
     }
 
     // ── Inventory builders ─────────────────────────────────────────

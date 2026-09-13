@@ -91,10 +91,11 @@ public class PurchaseService : IPurchaseService
                 {
                     Title = "New Purchase",
                     Message = $"A new purchase from {supplierName} has been created.",
-                    Type = "Purchase",
+                    Type = "success",
+                    Icon = "shopping_cart",
                     RelatedEntityId = created.Id,
                     RelatedEntityType = "Purchase",
-                    Link = $"/purchases"
+                    Link = $"/purchases/{created.Id}"
                 });
         }
 
@@ -178,7 +179,7 @@ public class PurchaseService : IPurchaseService
                 Type = "Purchase",
                 RelatedEntityId = id,
                 RelatedEntityType = "Purchase",
-                Link = $"/purchases"
+                Link = $"/purchases/{id}"
             });
 
         return result;

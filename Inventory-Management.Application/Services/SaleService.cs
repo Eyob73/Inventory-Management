@@ -148,7 +148,8 @@ public class SaleService : ISaleService
                 {
                     Title = "Sale Completed",
                     Message = $"Sale {created.SaleNumber} was completed successfully.",
-                    Type = "NewSale",
+                    Type = "info",
+                    Icon = "receipt",
                     RelatedEntityId = created.Id,
                     RelatedEntityType = "Sale",
                     Link = $"/sales-history/{created.Id}"

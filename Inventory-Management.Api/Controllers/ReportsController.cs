@@ -3,6 +3,7 @@ using Inventory_Management.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace Inventory_Management.Api.Controllers;
@@ -101,9 +102,11 @@ public class ReportsController : ControllerBase
 
     [HttpGet("export/{reportType}")]
     [Authorize(Roles = "Admin,Manager")]
-    [EndpointSummary("Export a report as CSV or Excel")]
+    [EnableRateLimiting("ExportLimiter")]
+    [EndpointSummary("Export a report as CSV, Excel, or PDF")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Export(
         string reportType,
         [FromQuery] ReportFilterDto filter,
@@ -113,6 +116,31 @@ public class ReportsController : ControllerBase
         try
         {
             var file = await _reports.ExportAsync(reportType, filter, format, cancellationToken);
+            return File(file.Content, file.ContentType, file.FileName);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { detail = ex.Message });
+        }
+    }
+
+    [HttpGet("export/composite")]
+    [Authorize(Roles = "Admin,Manager")]
+    [EnableRateLimiting("ExportLimiter")]
+    [EndpointSummary("Export a highly detailed composite report")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ExportComposite(
+        [FromQuery] ReportFilterDto filter,
+        [FromQuery] string format = "pdf",
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var tenantName = User.FindFirstValue("TenantName") ?? "Inventory Management System";
+            var userName = User.FindFirstValue(ClaimTypes.Name) ?? "System User";
+            var file = await _reports.ExportCompositeAsync(tenantName, userName, filter, format, cancellationToken);
             return File(file.Content, file.ContentType, file.FileName);
         }
         catch (ArgumentException ex)

@@ -12,17 +12,23 @@ public class InventoryService : IInventoryService
 {
     private readonly IGenericRepository<Product> _productRepository;
     private readonly IGenericRepository<InventoryTransaction> _transactionRepository;
+    private readonly IGenericRepository<Tenant> _tenantRepository;
+    private readonly ICurrentTenant _currentTenant;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
 
     public InventoryService(
         IGenericRepository<Product> productRepository,
         IGenericRepository<InventoryTransaction> transactionRepository,
+        IGenericRepository<Tenant> tenantRepository,
+        ICurrentTenant currentTenant,
         IUnitOfWork unitOfWork,
         INotificationService notificationService)
     {
         _productRepository = productRepository;
         _transactionRepository = transactionRepository;
+        _tenantRepository = tenantRepository;
+        _currentTenant = currentTenant;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
     }
@@ -190,10 +196,18 @@ public class InventoryService : IInventoryService
         });
 
         // Notifications
-        bool becameLowStock = previous > product.MinimumStock && next <= product.MinimumStock && next > 0;
+        int threshold = product.MinimumStock;
+        if (threshold == 0 && _currentTenant.TenantId.HasValue)
+        {
+            var tenant = await _tenantRepository.GetByIdAsync(_currentTenant.TenantId.Value);
+            if (tenant != null)
+                threshold = tenant.LowStockThreshold;
+        }
+
+        bool becameLowStock = previous > threshold && next <= threshold && next > 0;
         bool becameOutOfStock = previous > 0 && next == 0;
 
-        if (previous <= product.MinimumStock && previous > 0 && next == 0)
+        if (previous <= threshold && previous > 0 && next == 0)
         {
             becameOutOfStock = true;
             becameLowStock = false;
@@ -207,10 +221,11 @@ public class InventoryService : IInventoryService
                 {
                     Title = "Out of Stock",
                     Message = $"{product.Name} is currently out of stock.",
-                    Type = "OutOfStock",
+                    Type = "danger",
+                    Icon = "error_outline",
                     RelatedEntityId = product.Id,
                     RelatedEntityType = "Product",
-                    Link = $"/inventory"
+                    Link = $"/products/{product.Id}"
                 });
         }
         else if (becameLowStock)
@@ -221,10 +236,11 @@ public class InventoryService : IInventoryService
                 {
                     Title = "Low Stock Alert",
                     Message = $"{product.Name} is running low. Current stock: {next}.",
-                    Type = "LowStock",
+                    Type = "warning",
+                    Icon = "warning_amber",
                     RelatedEntityId = product.Id,
                     RelatedEntityType = "Product",
-                    Link = $"/inventory"
+                    Link = $"/products/{product.Id}"
                 });
         }
     }

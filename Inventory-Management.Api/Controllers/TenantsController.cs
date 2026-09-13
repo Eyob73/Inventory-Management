@@ -2,6 +2,7 @@ using Inventory_Management.Application.DTOs.Tenant;
 using Inventory_Management.Application.Features.Tenants.Commands;
 using Inventory_Management.Application.Features.Tenants.Queries;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -51,5 +52,39 @@ public class TenantsController : ControllerBase
     {
         var created = await _sender.Send(new CreateTenantCommand(dto), cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+    }
+
+    [HttpGet("mine")]
+    [Authorize]
+    [EndpointSummary("Retrieve current user's tenant")]
+    [EndpointDescription("Fetches detailed information for the current user's SaaS tenant.")]
+    [ProducesResponseType(typeof(TenantDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<TenantDto>> GetMyTenant(CancellationToken cancellationToken = default)
+    {
+        var tenantIdClaim = User.FindFirst("TenantId")?.Value;
+        if (string.IsNullOrEmpty(tenantIdClaim) || !Guid.TryParse(tenantIdClaim, out var tenantId))
+        {
+            return Unauthorized("User does not belong to a tenant.");
+        }
+
+        var tenant = await _sender.Send(new GetMyTenantQuery(tenantId), cancellationToken);
+        return Ok(tenant);
+    }
+
+    [HttpPut("mine")]
+    [Authorize(Roles = "Admin")]
+    [EndpointSummary("Update current user's tenant")]
+    [EndpointDescription("Updates the profile details of the current user's SaaS tenant.")]
+    [ProducesResponseType(typeof(TenantDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<TenantDto>> UpdateMyTenant([FromBody] UpdateMyTenantDto dto, CancellationToken cancellationToken = default)
+    {
+        var tenantIdClaim = User.FindFirst("TenantId")?.Value;
+        if (string.IsNullOrEmpty(tenantIdClaim) || !Guid.TryParse(tenantIdClaim, out var tenantId))
+        {
+            return Unauthorized("User does not belong to a tenant.");
+        }
+
+        var updated = await _sender.Send(new UpdateMyTenantCommand(tenantId, dto), cancellationToken);
+        return Ok(updated);
     }
 }

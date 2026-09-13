@@ -16,7 +16,7 @@ public class TokenService
         _config = config;
     }
 
-    public string GenerateJwt(AppUser user, IList<string> roles)
+    public string GenerateJwt(AppUser user, IList<string> roles, string? tenantName = null)
     {
         var claims = new List<Claim>
         {
@@ -29,6 +29,10 @@ public class TokenService
         if (user.TenantId.HasValue)
         {
             claims.Add(new Claim("TenantId", user.TenantId.Value.ToString()));
+            if (!string.IsNullOrEmpty(tenantName))
+            {
+                claims.Add(new Claim("TenantName", tenantName));
+            }
         }
         foreach (var role in roles)
         {

@@ -147,6 +147,13 @@ builder.Services.AddRateLimiter(options =>
         opt.Window = TimeSpan.FromMinutes(1);
         opt.QueueLimit = 0;
     });
+
+    options.AddConcurrencyLimiter("ExportLimiter", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.QueueLimit = 10;
+        opt.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+    });
 });
 
 var app = builder.Build();

@@ -14,12 +14,18 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
     private readonly IGenericRepository<Product> _productRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IFileStorageService _fileStorageService;
+    private readonly INotificationService _notificationService;
 
-    public CreateProductCommandHandler(IGenericRepository<Product> productRepository, IUnitOfWork unitOfWork, IFileStorageService fileStorageService)
+    public CreateProductCommandHandler(
+        IGenericRepository<Product> productRepository, 
+        IUnitOfWork unitOfWork, 
+        IFileStorageService fileStorageService,
+        INotificationService notificationService)
     {
         _productRepository = productRepository;
         _unitOfWork = unitOfWork;
         _fileStorageService = fileStorageService;
+        _notificationService = notificationService;
     }
 
     public async Task<ProductDto> Handle(CreateProductCommand command, CancellationToken cancellationToken)
@@ -61,6 +67,19 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
 
         await _productRepository.AddAsync(product);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        await _notificationService.SendToRolesAsync(
+            new[] { "Admin", "Manager" },
+            new Inventory_Management.Application.DTOs.Notification.NotificationDto
+            {
+                Title = "New Product Added",
+                Message = $"Product '{product.Name}' (SKU: {product.SKU}) has been added to the catalog.",
+                Type = "info",
+                Icon = "inventory_2",
+                RelatedEntityId = product.Id,
+                RelatedEntityType = "Product",
+                Link = $"/products/{product.Id}"
+            });
 
         return Map(product);
     }
