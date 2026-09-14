@@ -174,6 +174,26 @@ public class UserService : IUserService
         return (true, userDto, null);
     }
 
+    public async Task<(bool Success, UserDto? User, IEnumerable<string>? Errors)> UpdatePreferencesAsync(string id, UpdateUserPreferencesDto dto, CancellationToken cancellationToken = default)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return (false, null, new[] { "User not found." });
+        }
+
+        user.PreferredLanguage = dto.PreferredLanguage;
+
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            return (false, null, result.Errors.Select(e => e.Description));
+        }
+
+        var userDto = await MapToDtoAsync(user);
+        return (true, userDto, null);
+    }
+
     public async Task<(bool Success, IEnumerable<string>? Errors)> DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
         var user = await _userManager.FindByIdAsync(id);
@@ -235,7 +255,8 @@ public class UserService : IUserService
             PhoneNumber = user.PhoneNumber,
             TenantId = user.TenantId,
             Roles = roles,
-            IsLockedOut = isLockedOut
+            IsLockedOut = isLockedOut,
+            PreferredLanguage = user.PreferredLanguage
         };
     }
 }

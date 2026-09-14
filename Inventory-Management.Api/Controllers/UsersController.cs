@@ -4,6 +4,7 @@ using Inventory_Management.Application.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace Inventory_Management.Api.Controllers;
 
@@ -75,6 +76,46 @@ public class UsersController : ControllerBase
             return BadRequest(new { errors });
 
         return CreatedAtAction(nameof(GetById), new { id = user!.Id }, user);
+    }
+
+    [HttpGet("me")]
+    [EndpointSummary("Retrieve current user profile")]
+    [EndpointDescription("Fetches detailed user profile for the currently authenticated user.")]
+    [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<UserDto>> GetMe(CancellationToken cancellationToken = default)
+    {
+        var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+        var user = await _userService.GetByIdAsync(userId, cancellationToken);
+        if (user == null)
+            return NotFound(new { detail = "User not found." });
+
+        return Ok(user);
+    }
+
+    [HttpPut("me/preferences")]
+    [EndpointSummary("Update current user preferences")]
+    [EndpointDescription("Updates user preferences such as preferred language for the currently authenticated user.")]
+    [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<UserDto>> UpdatePreferences([FromBody] UpdateUserPreferencesDto dto, CancellationToken cancellationToken = default)
+    {
+        var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+        var (success, user, errors) = await _userService.UpdatePreferencesAsync(userId, dto, cancellationToken);
+        if (!success)
+        {
+            if (errors?.Contains("User not found.") == true)
+                return NotFound(new { detail = "User not found." });
+
+            return BadRequest(new { errors });
+        }
+
+        return Ok(user);
     }
 
     [HttpPut("{id}")]

@@ -25,6 +25,7 @@ public class TokenService
             new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
             new Claim("FirstName", user.FirstName),
             new Claim("LastName", user.LastName),
+            new Claim("PreferredLanguage", user.PreferredLanguage ?? "en")
         };
         if (user.TenantId.HasValue)
         {

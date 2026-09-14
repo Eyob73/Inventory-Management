@@ -8,4 +8,5 @@ public class AppUser : IdentityUser, IMultiTenant
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public Guid? TenantId { get; set; }
+    public string PreferredLanguage { get; set; } = "en";
 }

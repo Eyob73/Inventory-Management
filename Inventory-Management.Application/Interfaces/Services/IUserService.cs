@@ -10,6 +10,7 @@ public interface IUserService
     Task<UserDto?> GetByIdAsync(string id, CancellationToken cancellationToken = default);
     Task<(bool Success, UserDto? User, IEnumerable<string>? Errors)> CreateAsync(CreateUserDto dto, CancellationToken cancellationToken = default);
     Task<(bool Success, UserDto? User, IEnumerable<string>? Errors)> UpdateAsync(string id, UpdateUserDto dto, CancellationToken cancellationToken = default);
+    Task<(bool Success, UserDto? User, IEnumerable<string>? Errors)> UpdatePreferencesAsync(string id, UpdateUserPreferencesDto dto, CancellationToken cancellationToken = default);
     Task<(bool Success, IEnumerable<string>? Errors)> DeleteAsync(string id, CancellationToken cancellationToken = default);
     Task<(bool Success, bool IsLockedOut, IEnumerable<string>? Errors)> ToggleLockoutAsync(string id, CancellationToken cancellationToken = default);
 }
