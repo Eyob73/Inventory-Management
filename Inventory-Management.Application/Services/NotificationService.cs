@@ -11,17 +11,20 @@ public class NotificationService : INotificationService
 {
     private readonly IGenericRepository<Notification> _notificationRepository;
     private readonly INotificationDispatcher _dispatcher;
+    private readonly IWebPushService _webPushService;
     private readonly UserManager<AppUser> _userManager;
     private readonly IUnitOfWork _unitOfWork;
 
     public NotificationService(
         IGenericRepository<Notification> notificationRepository,
         INotificationDispatcher dispatcher,
+        IWebPushService webPushService,
         UserManager<AppUser> userManager,
         IUnitOfWork unitOfWork)
     {
         _notificationRepository = notificationRepository;
         _dispatcher = dispatcher;
+        _webPushService = webPushService;
         _userManager = userManager;
         _unitOfWork = unitOfWork;
     }
@@ -49,7 +52,11 @@ public class NotificationService : INotificationService
         dto.Timestamp = notification.CreatedAt;
         dto.Read = false;
 
+        // Send via SignalR (online users)
         await _dispatcher.SendToUserAsync(userId, dto, cancellationToken);
+        
+        // Send via WebPush (offline/background users)
+        await _webPushService.SendPushNotificationAsync(userId, dto, cancellationToken);
     }
 
     public async Task SendToRolesAsync(IEnumerable<string> roles, NotificationDto dto, CancellationToken cancellationToken = default)

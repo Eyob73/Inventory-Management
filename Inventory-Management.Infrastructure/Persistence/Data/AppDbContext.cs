@@ -31,6 +31,7 @@ public class AppDbContext : IdentityDbContext<AppUser>
     public DbSet<InventoryTransaction> InventoryTransactions { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<Notification> Notifications { get; set; }
+    public DbSet<PushSubscription> PushSubscriptions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -58,6 +58,7 @@ builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<ISaleService, SaleService>();
 builder.Services.AddScoped<ISaleItemService, SaleItemService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
+builder.Services.AddScoped<IWebPushService, WebPushService>();
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<IPurchaseItemService, PurchaseItemService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
