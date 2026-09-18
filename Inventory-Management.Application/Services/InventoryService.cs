@@ -5,6 +5,7 @@ using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Domain.Entities;
 using Inventory_Management.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Inventory_Management.Application.Services;
 
@@ -16,6 +17,7 @@ public class InventoryService : IInventoryService
     private readonly ICurrentTenant _currentTenant;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
+    private readonly IBackgroundTaskQueue _taskQueue;
 
     public InventoryService(
         IGenericRepository<Product> productRepository,
@@ -23,7 +25,8 @@ public class InventoryService : IInventoryService
         IGenericRepository<Tenant> tenantRepository,
         ICurrentTenant currentTenant,
         IUnitOfWork unitOfWork,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IBackgroundTaskQueue taskQueue)
     {
         _productRepository = productRepository;
         _transactionRepository = transactionRepository;
@@ -31,6 +34,7 @@ public class InventoryService : IInventoryService
         _currentTenant = currentTenant;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
+        _taskQueue = taskQueue;
     }
 
     public Task IncreaseStockAsync(
@@ -215,33 +219,43 @@ public class InventoryService : IInventoryService
 
         if (becameOutOfStock)
         {
-            await _notificationService.SendToRolesAsync(
-                new[] { "Admin", "Manager" },
-                new Inventory_Management.Application.DTOs.Notification.NotificationDto
-                {
-                    Title = "Out of Stock",
-                    Message = $"{product.Name} is currently out of stock.",
-                    Type = "danger",
-                    Icon = "error_outline",
-                    RelatedEntityId = product.Id,
-                    RelatedEntityType = "Product",
-                    Link = $"/products/{product.Id}"
-                });
+            var notificationDto = new Inventory_Management.Application.DTOs.Notification.NotificationDto
+            {
+                Title = "Out of Stock",
+                Message = $"{product.Name} is currently out of stock.",
+                Type = "danger",
+                Icon = "error_outline",
+                RelatedEntityId = product.Id,
+                RelatedEntityType = "Product",
+                Link = $"/products/{product.Id}"
+            };
+
+            var tenantId = _currentTenant?.TenantId;
+            await _taskQueue.QueueBackgroundWorkItemAsync(tenantId, async (sp, ct) =>
+            {
+                var ns = sp.GetRequiredService<INotificationService>();
+                await ns.SendToRolesAsync(new[] { "Admin", "Manager" }, notificationDto, ct);
+            });
         }
         else if (becameLowStock)
         {
-            await _notificationService.SendToRolesAsync(
-                new[] { "Admin", "Manager" },
-                new Inventory_Management.Application.DTOs.Notification.NotificationDto
-                {
-                    Title = "Low Stock Alert",
-                    Message = $"{product.Name} is running low. Current stock: {next}.",
-                    Type = "warning",
-                    Icon = "warning_amber",
-                    RelatedEntityId = product.Id,
-                    RelatedEntityType = "Product",
-                    Link = $"/products/{product.Id}"
-                });
+            var notificationDto = new Inventory_Management.Application.DTOs.Notification.NotificationDto
+            {
+                Title = "Low Stock Alert",
+                Message = $"{product.Name} is running low. Current stock: {next}.",
+                Type = "warning",
+                Icon = "warning_amber",
+                RelatedEntityId = product.Id,
+                RelatedEntityType = "Product",
+                Link = $"/products/{product.Id}"
+            };
+
+            var tenantId = _currentTenant?.TenantId;
+            await _taskQueue.QueueBackgroundWorkItemAsync(tenantId, async (sp, ct) =>
+            {
+                var ns = sp.GetRequiredService<INotificationService>();
+                await ns.SendToRolesAsync(new[] { "Admin", "Manager" }, notificationDto, ct);
+            });
         }
     }
 

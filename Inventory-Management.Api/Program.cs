@@ -70,6 +70,10 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationDispatcher, Inventory_Management.Api.Services.SignalRNotificationDispatcher>();
 builder.Services.AddSignalR();
 
+// Background Queuing
+builder.Services.AddSingleton<IBackgroundTaskQueue, Inventory_Management.Infrastructure.Services.BackgroundTaskQueue>();
+builder.Services.AddHostedService<Inventory_Management.Api.Services.BackgroundWorkerService>();
+
 builder.Services.AddIdentityCore<AppUser>(options =>
 {
     // Enterprise Password Policy

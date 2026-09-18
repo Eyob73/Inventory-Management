@@ -5,6 +5,7 @@ using Inventory_Management.Application.Interfaces.Repositories;
 using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Domain.Entities;
 using Inventory_Management.Domain.Enums;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Inventory_Management.Application.Services;
 
@@ -16,6 +17,8 @@ public class SaleService : ISaleService
     private readonly IInventoryService _inventoryService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
+    private readonly IBackgroundTaskQueue _taskQueue;
+    private readonly ICurrentTenant _currentTenant;
 
     public SaleService(
         ISaleRepository saleRepository,
@@ -23,7 +26,9 @@ public class SaleService : ISaleService
         IGenericRepository<Customer> customerRepository,
         IInventoryService inventoryService,
         IUnitOfWork unitOfWork,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IBackgroundTaskQueue taskQueue,
+        ICurrentTenant currentTenant)
     {
         _saleRepository = saleRepository;
         _productRepository = productRepository;
@@ -31,6 +36,8 @@ public class SaleService : ISaleService
         _inventoryService = inventoryService;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
+        _taskQueue = taskQueue;
+        _currentTenant = currentTenant;
     }
 
     public async Task<SaleDto> CreateSaleAsync(CreateSaleDto dto, string? userId, string? cashierName)
@@ -142,18 +149,23 @@ public class SaleService : ISaleService
 
         if (created != null)
         {
-            await _notificationService.SendToRolesAsync(
-                new[] { "Admin", "Manager" },
-                new Inventory_Management.Application.DTOs.Notification.NotificationDto
-                {
-                    Title = "Sale Completed",
-                    Message = $"Sale {created.SaleNumber} was completed successfully.",
-                    Type = "info",
-                    Icon = "receipt",
-                    RelatedEntityId = created.Id,
-                    RelatedEntityType = "Sale",
-                    Link = $"/sales-history/{created.Id}"
-                });
+            var notificationDto = new Inventory_Management.Application.DTOs.Notification.NotificationDto
+            {
+                Title = "Sale Completed",
+                Message = $"Sale {created.SaleNumber} was completed successfully.",
+                Type = "info",
+                Icon = "receipt",
+                RelatedEntityId = created.Id,
+                RelatedEntityType = "Sale",
+                Link = $"/sales-history/{created.Id}"
+            };
+
+            var tenantId = _currentTenant?.TenantId;
+            await _taskQueue.QueueBackgroundWorkItemAsync(tenantId, async (sp, ct) =>
+            {
+                var ns = sp.GetRequiredService<INotificationService>();
+                await ns.SendToRolesAsync(new[] { "Admin", "Manager" }, notificationDto, ct);
+            });
         }
 
         return MapToDto(created!);
