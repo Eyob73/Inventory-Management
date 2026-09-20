@@ -21,6 +21,7 @@ public class Sale : IMultiTenant
     public decimal DiscountAmount { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal TotalAmount { get; set; }
+    public decimal TotalBottleDeposit { get; set; }
 
     public string PaymentMethod { get; set; } = "Cash";
     public decimal AmountReceived { get; set; }

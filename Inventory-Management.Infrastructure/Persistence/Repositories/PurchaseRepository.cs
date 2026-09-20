@@ -17,6 +17,7 @@ public class PurchaseRepository : GenericRepository<Purchase>, IPurchaseReposito
             .Include(p => p.Supplier)
             .Include(p => p.PurchaseItems)
                 .ThenInclude(i => i.Product)
+                .ThenInclude(p => p.BottleType)
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 
@@ -37,3 +38,4 @@ public class PurchaseRepository : GenericRepository<Purchase>, IPurchaseReposito
         return candidate;
     }
 }
+

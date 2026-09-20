@@ -6,4 +6,6 @@ public class CreateSaleItemDto
     public int Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal DiscountAmount { get; set; }
+    public bool IsBottleExchange { get; set; }
+    public decimal BottleDepositAmount { get; set; }
 }

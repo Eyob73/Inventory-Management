@@ -49,6 +49,11 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
             .HasForeignKey(p => p.CategoryId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(p => p.BottleType)
+            .WithMany(b => b.Products)
+            .HasForeignKey(p => p.BottleTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne(p => p.Supplier)
             .WithMany(s => s.Products)
             .HasForeignKey(p => p.SupplierId)

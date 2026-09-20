@@ -124,7 +124,7 @@ public class CustomerService : ICustomerService
         {
             Id = Guid.NewGuid(),
             Name = dto.Name.Trim(),
-            Email = dto.Email?.Trim() ?? string.Empty,
+            Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim(),
             PhoneNumber = dto.PhoneNumber.Trim(),
             Address = dto.Address?.Trim() ?? string.Empty,
             IsActive = dto.IsActive,
@@ -178,7 +178,7 @@ public class CustomerService : ICustomerService
         }
 
         customer.Name = dto.Name.Trim();
-        customer.Email = dto.Email?.Trim() ?? string.Empty;
+        customer.Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
         customer.PhoneNumber = dto.PhoneNumber.Trim();
         customer.Address = dto.Address?.Trim() ?? string.Empty;
         customer.IsActive = dto.IsActive;
@@ -220,3 +220,4 @@ public class CustomerService : ICustomerService
         await _unitOfWork.SaveChangesAsync();
     }
 }
+

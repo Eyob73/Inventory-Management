@@ -12,17 +12,20 @@ public record CreateProductCommand(CreateProductDto Dto) : IRequest<ProductDto>;
 public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, ProductDto>
 {
     private readonly IGenericRepository<Product> _productRepository;
+    private readonly IGenericRepository<BottleType> _bottleTypeRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IFileStorageService _fileStorageService;
     private readonly INotificationService _notificationService;
 
     public CreateProductCommandHandler(
         IGenericRepository<Product> productRepository, 
+        IGenericRepository<BottleType> bottleTypeRepository,
         IUnitOfWork unitOfWork, 
         IFileStorageService fileStorageService,
         INotificationService notificationService)
     {
         _productRepository = productRepository;
+        _bottleTypeRepository = bottleTypeRepository;
         _unitOfWork = unitOfWork;
         _fileStorageService = fileStorageService;
         _notificationService = notificationService;
@@ -48,6 +51,13 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             imageUrl = await _fileStorageService.SaveProductImageAsync(dto.Image);
         }
 
+        decimal depositAmount = 0;
+        if (dto.IsReturnable && dto.BottleTypeId.HasValue)
+        {
+            var bt = await _bottleTypeRepository.GetByIdAsync(dto.BottleTypeId.Value);
+            if (bt != null) depositAmount = bt.DepositAmount;
+        }
+
         var product = new Product
         {
             Id = Guid.NewGuid(),
@@ -62,6 +72,9 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             IsActive = dto.IsActive,
             CategoryId = dto.CategoryId,
             SupplierId = dto.SupplierId,
+            IsReturnable = dto.IsReturnable,
+            BottleTypeId = dto.IsReturnable ? dto.BottleTypeId : null,
+            BottleDepositAmount = depositAmount,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -99,6 +112,13 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         CategoryId = p.CategoryId,
         SupplierId = p.SupplierId,
         CreatedAt = p.CreatedAt,
-        UpdatedAt = p.UpdatedAt
+        UpdatedAt = p.UpdatedAt,
+        IsReturnable = p.IsReturnable,
+        BottleTypeId = p.BottleTypeId,
+        BottleDepositAmount = p.BottleDepositAmount
     };
 }
+
+
+
+

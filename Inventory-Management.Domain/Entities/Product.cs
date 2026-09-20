@@ -20,6 +20,10 @@ public class Product : IMultiTenant, ISoftDelete
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
+    public Guid? BottleTypeId { get; set; }
+    public BottleType? BottleType { get; set; }
+    public bool IsReturnable { get; set; }
+    public decimal BottleDepositAmount { get; set; }
     public Guid CategoryId { get; set; }
     public Category? Category { get; set; }
 

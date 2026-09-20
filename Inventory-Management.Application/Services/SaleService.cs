@@ -19,6 +19,7 @@ public class SaleService : ISaleService
     private readonly INotificationService _notificationService;
     private readonly IBackgroundTaskQueue _taskQueue;
     private readonly ICurrentTenant _currentTenant;
+    private readonly MediatR.IMediator _mediator;
 
     public SaleService(
         ISaleRepository saleRepository,
@@ -28,7 +29,8 @@ public class SaleService : ISaleService
         IUnitOfWork unitOfWork,
         INotificationService notificationService,
         IBackgroundTaskQueue taskQueue,
-        ICurrentTenant currentTenant)
+        ICurrentTenant currentTenant,
+        MediatR.IMediator mediator)
     {
         _saleRepository = saleRepository;
         _productRepository = productRepository;
@@ -38,6 +40,7 @@ public class SaleService : ISaleService
         _notificationService = notificationService;
         _taskQueue = taskQueue;
         _currentTenant = currentTenant;
+        _mediator = mediator;
     }
 
     public async Task<SaleDto> CreateSaleAsync(CreateSaleDto dto, string? userId, string? cashierName)
@@ -129,7 +132,9 @@ public class SaleService : ISaleService
                     UnitPrice = itemDto.UnitPrice,
                     DiscountAmount = lineDiscount,
                     Subtotal = lineSubtotal,
-                    TotalPrice = lineTotal
+                    TotalPrice = lineTotal,
+                    IsBottleExchange = itemDto.IsBottleExchange,
+                    BottleDepositAmount = itemDto.BottleDepositAmount
                 });
             }
 
@@ -145,6 +150,22 @@ public class SaleService : ISaleService
             await _saleRepository.AddAsync(sale);
             await _unitOfWork.SaveChangesAsync();
             created = sale;
+
+            // Process bottle tracking
+            var bottleCmd = new Inventory_Management.Application.Features.Sales.Commands.ProcessSaleBottlesCommand
+            {
+                SaleId = sale.Id,
+                CustomerId = sale.CustomerId,
+                User = cashierName ?? userId ?? "System",
+                Items = dto.Items.Select(x => new Inventory_Management.Application.Features.Sales.Commands.ProcessSaleBottleItem
+                {
+                    ProductId = x.ProductId,
+                    Quantity = x.Quantity,
+                    IsBottleExchange = x.IsBottleExchange,
+                    BottleDepositAmount = x.BottleDepositAmount
+                }).ToList()
+            };
+            await _mediator.Send(bottleCmd);
         });
 
         if (created != null)
@@ -256,7 +277,10 @@ public class SaleService : ISaleService
             UnitPrice = si.UnitPrice,
             DiscountAmount = si.DiscountAmount,
             Subtotal = si.Subtotal,
-            TotalPrice = si.TotalPrice
+            TotalPrice = si.TotalPrice,
+            IsBottleExchange = si.IsBottleExchange,
+            BottleDepositAmount = si.BottleDepositAmount
         }).ToList()
     };
 }
+

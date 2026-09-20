@@ -16,4 +16,7 @@ public class ProductDto
     public Guid? SupplierId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public bool IsReturnable { get; set; }
+    public Guid? BottleTypeId { get; set; }
+    public decimal BottleDepositAmount { get; set; }
 }

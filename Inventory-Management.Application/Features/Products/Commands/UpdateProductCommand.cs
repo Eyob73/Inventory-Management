@@ -12,12 +12,14 @@ public record UpdateProductCommand(UpdateProductDto Dto) : IRequest<ProductDto>;
 public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand, ProductDto>
 {
     private readonly IGenericRepository<Product> _productRepository;
+    private readonly IGenericRepository<BottleType> _bottleTypeRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IFileStorageService _fileStorageService;
 
-    public UpdateProductCommandHandler(IGenericRepository<Product> productRepository, IUnitOfWork unitOfWork, IFileStorageService fileStorageService)
+    public UpdateProductCommandHandler(IGenericRepository<Product> productRepository, IGenericRepository<BottleType> bottleTypeRepository, IUnitOfWork unitOfWork, IFileStorageService fileStorageService)
     {
         _productRepository = productRepository;
+        _bottleTypeRepository = bottleTypeRepository;
         _unitOfWork = unitOfWork;
         _fileStorageService = fileStorageService;
     }
@@ -50,6 +52,13 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             product.ImageUrl = null;
         }
 
+                decimal depositAmount = 0;
+        if (dto.IsReturnable && dto.BottleTypeId.HasValue)
+        {
+            var bt = await _bottleTypeRepository.GetByIdAsync(dto.BottleTypeId.Value);
+            if (bt != null) depositAmount = bt.DepositAmount;
+        }
+
         product.Name = dto.Name;
         product.SKU = sku;
         product.Description = dto.Description ?? string.Empty;
@@ -59,6 +68,9 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         product.IsActive = dto.IsActive;
         product.CategoryId = dto.CategoryId;
         product.SupplierId = dto.SupplierId;
+        product.IsReturnable = dto.IsReturnable;
+        product.BottleTypeId = dto.IsReturnable ? dto.BottleTypeId : null;
+        product.BottleDepositAmount = depositAmount;
         product.UpdatedAt = DateTime.UtcNow;
 
         await _productRepository.UpdateAsync(product);
@@ -79,7 +91,13 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             CategoryId = product.CategoryId,
             SupplierId = product.SupplierId,
             CreatedAt = product.CreatedAt,
-            UpdatedAt = product.UpdatedAt
+            UpdatedAt = product.UpdatedAt,
+            IsReturnable = product.IsReturnable,
+            BottleTypeId = product.BottleTypeId,
+            BottleDepositAmount = product.BottleDepositAmount
         };
     }
 }
+
+
+

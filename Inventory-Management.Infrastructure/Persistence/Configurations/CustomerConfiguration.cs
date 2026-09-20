@@ -15,7 +15,7 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
             .HasMaxLength(150);
 
         builder.Property(c => c.Email)
-            .IsRequired()
+            .IsRequired(false)
             .HasMaxLength(200);
 
         builder.HasIndex(c => c.Email)
@@ -33,3 +33,4 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+

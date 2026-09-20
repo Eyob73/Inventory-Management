@@ -33,6 +33,11 @@ public class AppDbContext : IdentityDbContext<AppUser>
     public DbSet<Notification> Notifications { get; set; }
     public DbSet<PushSubscription> PushSubscriptions { get; set; }
 
+    public DbSet<BottleType> BottleTypes { get; set; }
+    public DbSet<BottleInventory> BottleInventories { get; set; }
+    public DbSet<CustomerBottleBalance> CustomerBottleBalances { get; set; }
+    public DbSet<BottleTransaction> BottleTransactions { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

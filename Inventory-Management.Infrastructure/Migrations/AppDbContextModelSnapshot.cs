@@ -101,6 +101,146 @@ namespace Inventory_Management.Infrastructure.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
+            modelBuilder.Entity("Inventory_Management.Domain.Entities.BottleInventory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BottleTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("DamagedBottles")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EmptyBottles")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FullBottles")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("LastUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LostBottles")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("WithCustomers")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BottleTypeId");
+
+                    b.ToTable("BottleInventories");
+                });
+
+            modelBuilder.Entity("Inventory_Management.Domain.Entities.BottleTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BottleTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("DepositAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ReferenceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReferenceType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TransactionType")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BottleTypeId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.ToTable("BottleTransactions");
+                });
+
+            modelBuilder.Entity("Inventory_Management.Domain.Entities.BottleType", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Capacity")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("DepositAmount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Material")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("BottleTypes");
+                });
+
             modelBuilder.Entity("Inventory_Management.Domain.Entities.Category", b =>
                 {
                     b.Property<Guid>("Id")
@@ -155,7 +295,6 @@ namespace Inventory_Management.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
-                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
@@ -187,6 +326,39 @@ namespace Inventory_Management.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Customers");
+                });
+
+            modelBuilder.Entity("Inventory_Management.Domain.Entities.CustomerBottleBalance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Balance")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("BottleTypeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("LastUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("TotalDeposit")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BottleTypeId");
+
+                    b.HasIndex("CustomerId");
+
+                    b.ToTable("CustomerBottleBalances");
                 });
 
             modelBuilder.Entity("Inventory_Management.Domain.Entities.InventoryTransaction", b =>
@@ -318,6 +490,12 @@ namespace Inventory_Management.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("BottleDepositAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("BottleTypeId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("CategoryId")
                         .HasColumnType("uuid");
 
@@ -344,6 +522,9 @@ namespace Inventory_Management.Infrastructure.Migrations
                         .HasDefaultValue(true);
 
                     b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsReturnable")
                         .HasColumnType("boolean");
 
                     b.Property<int>("MinimumStock")
@@ -383,6 +564,8 @@ namespace Inventory_Management.Infrastructure.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BottleTypeId");
 
                     b.HasIndex("CategoryId");
 
@@ -610,6 +793,9 @@ namespace Inventory_Management.Infrastructure.Migrations
                     b.Property<decimal>("TotalAmount")
                         .HasColumnType("numeric(18,2)");
 
+                    b.Property<decimal>("TotalBottleDeposit")
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<string>("UserId")
                         .HasColumnType("text");
 
@@ -635,8 +821,17 @@ namespace Inventory_Management.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("BottleDepositAmount")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid?>("BottleTypeId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("DiscountAmount")
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<bool>("IsBottleExchange")
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
@@ -920,6 +1115,53 @@ namespace Inventory_Management.Infrastructure.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Inventory_Management.Domain.Entities.BottleInventory", b =>
+                {
+                    b.HasOne("Inventory_Management.Domain.Entities.BottleType", "BottleType")
+                        .WithMany("BottleInventories")
+                        .HasForeignKey("BottleTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BottleType");
+                });
+
+            modelBuilder.Entity("Inventory_Management.Domain.Entities.BottleTransaction", b =>
+                {
+                    b.HasOne("Inventory_Management.Domain.Entities.BottleType", "BottleType")
+                        .WithMany("BottleTransactions")
+                        .HasForeignKey("BottleTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Management.Domain.Entities.Customer", "Customer")
+                        .WithMany("BottleTransactions")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("BottleType");
+
+                    b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("Inventory_Management.Domain.Entities.CustomerBottleBalance", b =>
+                {
+                    b.HasOne("Inventory_Management.Domain.Entities.BottleType", "BottleType")
+                        .WithMany("CustomerBottleBalances")
+                        .HasForeignKey("BottleTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Inventory_Management.Domain.Entities.Customer", "Customer")
+                        .WithMany("BottleBalances")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("BottleType");
+
+                    b.Navigation("Customer");
+                });
+
             modelBuilder.Entity("Inventory_Management.Domain.Entities.InventoryTransaction", b =>
                 {
                     b.HasOne("Inventory_Management.Domain.Entities.Product", "Product")
@@ -944,6 +1186,11 @@ namespace Inventory_Management.Infrastructure.Migrations
 
             modelBuilder.Entity("Inventory_Management.Domain.Entities.Product", b =>
                 {
+                    b.HasOne("Inventory_Management.Domain.Entities.BottleType", "BottleType")
+                        .WithMany("Products")
+                        .HasForeignKey("BottleTypeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Inventory_Management.Domain.Entities.Category", "Category")
                         .WithMany("Products")
                         .HasForeignKey("CategoryId")
@@ -954,6 +1201,8 @@ namespace Inventory_Management.Infrastructure.Migrations
                         .WithMany("Products")
                         .HasForeignKey("SupplierId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("BottleType");
 
                     b.Navigation("Category");
 
@@ -1087,6 +1336,17 @@ namespace Inventory_Management.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Inventory_Management.Domain.Entities.BottleType", b =>
+                {
+                    b.Navigation("BottleInventories");
+
+                    b.Navigation("BottleTransactions");
+
+                    b.Navigation("CustomerBottleBalances");
+
+                    b.Navigation("Products");
+                });
+
             modelBuilder.Entity("Inventory_Management.Domain.Entities.Category", b =>
                 {
                     b.Navigation("Products");
@@ -1094,6 +1354,10 @@ namespace Inventory_Management.Infrastructure.Migrations
 
             modelBuilder.Entity("Inventory_Management.Domain.Entities.Customer", b =>
                 {
+                    b.Navigation("BottleBalances");
+
+                    b.Navigation("BottleTransactions");
+
                     b.Navigation("Sales");
                 });
 

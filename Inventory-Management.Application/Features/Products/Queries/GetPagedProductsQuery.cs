@@ -73,7 +73,10 @@ public class GetPagedProductsQueryHandler : IRequestHandler<GetPagedProductsQuer
             CategoryId = p.CategoryId,
             SupplierId = p.SupplierId,
             CreatedAt = p.CreatedAt,
-            UpdatedAt = p.UpdatedAt
+            UpdatedAt = p.UpdatedAt,
+            IsReturnable = p.IsReturnable,
+            BottleTypeId = p.BottleTypeId,
+            BottleDepositAmount = p.BottleDepositAmount
         }).ToList();
 
         return new PagedResponse<ProductDto>

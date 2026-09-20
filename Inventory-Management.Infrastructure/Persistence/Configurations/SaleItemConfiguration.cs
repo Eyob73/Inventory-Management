@@ -28,6 +28,9 @@ public class SaleItemConfiguration : IEntityTypeConfiguration<SaleItem>
         builder.Property(si => si.TotalPrice)
             .HasColumnType("numeric(18,2)");
 
+        builder.Property(si => si.BottleDepositAmount)
+            .HasColumnType("numeric(18,2)");
+
         builder.HasOne(si => si.Sale)
             .WithMany(s => s.SaleItems)
             .HasForeignKey(si => si.SaleId)

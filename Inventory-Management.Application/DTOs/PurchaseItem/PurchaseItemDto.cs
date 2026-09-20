@@ -10,4 +10,8 @@ public class PurchaseItemDto
     public int Quantity { get; set; }
     public decimal UnitCost { get; set; }
     public decimal TotalCost { get; set; }
+    public bool IsReturnable { get; set; }
+    public Guid? BottleTypeId { get; set; }
+    public string? BottleTypeName { get; set; }
 }
+

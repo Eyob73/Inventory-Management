@@ -17,6 +17,8 @@ public class PurchaseService : IPurchaseService
     private readonly IInventoryService _inventoryService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
+    private readonly IGenericRepository<Inventory_Management.Domain.Entities.BottleInventory> _bottleInvRepo;
+    private readonly IGenericRepository<BottleTransaction> _bottleTxRepo;
 
     public PurchaseService(
         IPurchaseRepository purchaseRepository,
@@ -25,7 +27,9 @@ public class PurchaseService : IPurchaseService
         IGenericRepository<Product> productRepository,
         IInventoryService inventoryService,
         IUnitOfWork unitOfWork,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IGenericRepository<Inventory_Management.Domain.Entities.BottleInventory> bottleInvRepo,
+        IGenericRepository<BottleTransaction> bottleTxRepo)
     {
         _purchaseRepository = purchaseRepository;
         _purchaseItemRepository = purchaseItemRepository;
@@ -34,6 +38,8 @@ public class PurchaseService : IPurchaseService
         _inventoryService = inventoryService;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
+        _bottleInvRepo = bottleInvRepo;
+        _bottleTxRepo = bottleTxRepo;
     }
 
     public async Task<PurchaseDto> GetByIdAsync(Guid id)
@@ -50,6 +56,7 @@ public class PurchaseService : IPurchaseService
             .Include(p => p.Supplier)
             .Include(p => p.PurchaseItems)
                 .ThenInclude(i => i.Product)
+                .ThenInclude(p => p.BottleType)
             .OrderByDescending(p => p.PurchaseDate)
             .ToListAsync();
 
@@ -147,7 +154,7 @@ public class PurchaseService : IPurchaseService
             if (purchase.SupplierId.HasValue)
                 await RequireActiveSupplierAsync(purchase.SupplierId);
 
-            foreach (var item in purchase.PurchaseItems)
+                        foreach (var item in purchase.PurchaseItems)
             {
                 item.TotalCost = item.Quantity * item.UnitCost;
                 await _inventoryService.IncreaseStockAsync(
@@ -158,6 +165,31 @@ public class PurchaseService : IPurchaseService
                     "Purchase",
                     $"Purchase {purchase.PurchaseNumber}",
                     createdBy);
+
+                if (item.Product != null && item.Product.IsReturnable && item.Product.BottleTypeId.HasValue)
+                {
+                    var bInv = await _bottleInvRepo.Query().FirstOrDefaultAsync(x => x.BottleTypeId == item.Product.BottleTypeId.Value);
+                    if (bInv == null) throw new InvalidOperationException($"Bottle inventory not found for type {item.Product.BottleTypeId}");
+
+                    if (bInv.EmptyBottles < item.Quantity)
+                        throw new InvalidOperationException($"Not enough empty bottles for '{item.Product.Name}'. Required: {item.Quantity}, Available: {bInv.EmptyBottles}. Shortage: {item.Quantity - bInv.EmptyBottles}");
+
+                    bInv.EmptyBottles -= item.Quantity;
+                    bInv.FullBottles += item.Quantity;
+                    bInv.LastUpdatedAt = DateTime.UtcNow;
+
+                    await _bottleTxRepo.AddAsync(new BottleTransaction
+                    {
+                        BottleTypeId = item.Product.BottleTypeId.Value,
+                        TransactionType = BottleTransactionType.Received,
+                        ReferenceType = "Purchase",
+                        ReferenceId = purchase.Id,
+                        Quantity = item.Quantity,
+                        Notes = $"Purchase {purchase.PurchaseNumber}",
+                        CreatedBy = createdBy,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
             }
 
             purchase.TotalAmount = purchase.PurchaseItems.Sum(i => i.TotalCost);
@@ -197,17 +229,43 @@ public class PurchaseService : IPurchaseService
 
             if (purchase.Status == PurchaseStatus.Completed)
             {
-                foreach (var item in purchase.PurchaseItems)
+                            foreach (var item in purchase.PurchaseItems)
+            {
+                item.TotalCost = item.Quantity * item.UnitCost;
+                await _inventoryService.IncreaseStockAsync(
+                    item.ProductId,
+                    item.Quantity,
+                    InventoryTransactionType.Purchase,
+                    purchase.Id,
+                    "Purchase",
+                    $"Purchase {purchase.PurchaseNumber}",
+                    createdBy);
+
+                if (item.Product != null && item.Product.IsReturnable && item.Product.BottleTypeId.HasValue)
                 {
-                    await _inventoryService.DecreaseStockAsync(
-                        item.ProductId,
-                        item.Quantity,
-                        InventoryTransactionType.PurchaseReversal,
-                        purchase.Id,
-                        "PurchaseReversal",
-                        $"Reversal of purchase {purchase.PurchaseNumber}",
-                        createdBy);
+                    var bInv = await _bottleInvRepo.Query().FirstOrDefaultAsync(x => x.BottleTypeId == item.Product.BottleTypeId.Value);
+                    if (bInv == null) throw new InvalidOperationException($"Bottle inventory not found for type {item.Product.BottleTypeId}");
+
+                    if (bInv.EmptyBottles < item.Quantity)
+                        throw new InvalidOperationException($"Not enough empty bottles for '{item.Product.Name}'. Required: {item.Quantity}, Available: {bInv.EmptyBottles}. Shortage: {item.Quantity - bInv.EmptyBottles}");
+
+                    bInv.EmptyBottles -= item.Quantity;
+                    bInv.FullBottles += item.Quantity;
+                    bInv.LastUpdatedAt = DateTime.UtcNow;
+
+                    await _bottleTxRepo.AddAsync(new BottleTransaction
+                    {
+                        BottleTypeId = item.Product.BottleTypeId.Value,
+                        TransactionType = BottleTransactionType.Received,
+                        ReferenceType = "Purchase",
+                        ReferenceId = purchase.Id,
+                        Quantity = item.Quantity,
+                        Notes = $"Purchase {purchase.PurchaseNumber}",
+                        CreatedBy = createdBy,
+                        CreatedAt = DateTime.UtcNow
+                    });
                 }
+            }
             }
 
             purchase.Status = PurchaseStatus.Cancelled;
@@ -326,8 +384,16 @@ public class PurchaseService : IPurchaseService
             ProductName = i.Product?.Name ?? string.Empty,
             SKU = i.Product?.SKU ?? string.Empty,
             Quantity = i.Quantity,
+            IsReturnable = i.Product?.IsReturnable ?? false,
+            BottleTypeId = i.Product?.BottleTypeId,
+            BottleTypeName = i.Product?.BottleType?.Name,
             UnitCost = i.UnitCost,
             TotalCost = i.TotalCost
         }).ToList()
     };
 }
+
+
+
+
+

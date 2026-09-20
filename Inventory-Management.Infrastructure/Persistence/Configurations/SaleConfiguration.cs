@@ -33,6 +33,9 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.Property(s => s.TotalAmount)
             .HasColumnType("numeric(18,2)");
 
+        builder.Property(s => s.TotalBottleDeposit)
+            .HasColumnType("numeric(18,2)");
+
         builder.Property(s => s.AmountReceived)
             .HasColumnType("numeric(18,2)");
 

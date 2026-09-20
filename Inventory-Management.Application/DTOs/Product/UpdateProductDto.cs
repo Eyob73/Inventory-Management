@@ -17,4 +17,7 @@ public class UpdateProductDto
     public bool IsActive { get; set; } = true;
     public Guid CategoryId { get; set; }
     public Guid? SupplierId { get; set; }
+    public bool IsReturnable { get; set; }
+    public Guid? BottleTypeId { get; set; }
 }
+

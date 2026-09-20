@@ -34,7 +34,10 @@ public class GetAllProductsQueryHandler : IRequestHandler<GetAllProductsQuery, I
             CategoryId = p.CategoryId,
             SupplierId = p.SupplierId,
             CreatedAt = p.CreatedAt,
-            UpdatedAt = p.UpdatedAt
+            UpdatedAt = p.UpdatedAt,
+            IsReturnable = p.IsReturnable,
+            BottleTypeId = p.BottleTypeId,
+            BottleDepositAmount = p.BottleDepositAmount
         });
     }
 }

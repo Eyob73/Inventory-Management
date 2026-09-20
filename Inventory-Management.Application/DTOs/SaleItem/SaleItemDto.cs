@@ -12,4 +12,7 @@ public class SaleItemDto
     public decimal DiscountAmount { get; set; }
     public decimal Subtotal { get; set; }
     public decimal TotalPrice { get; set; }
+    public bool IsBottleExchange { get; set; }
+    public decimal BottleDepositAmount { get; set; }
 }
+
