@@ -40,6 +40,23 @@ public class GetPagedCustomerBottlesQueryHandler : IRequestHandler<GetPagedCusto
                                      (x.BottleType != null && x.BottleType.Name.ToLower().Contains(search)));
         }
 
+        if (request.Request.BottleTypeId.HasValue)
+        {
+            query = query.Where(x => x.BottleTypeId == request.Request.BottleTypeId.Value);
+        }
+
+        if (request.Request.HasBalance.HasValue)
+        {
+            if (request.Request.HasBalance.Value)
+            {
+                query = query.Where(x => x.Balance > 0);
+            }
+            else
+            {
+                query = query.Where(x => x.Balance == 0);
+            }
+        }
+
         var totalCount = await query.CountAsync(cancellationToken);
 
         query = request.Request.Descending

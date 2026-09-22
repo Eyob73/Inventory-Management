@@ -37,6 +37,12 @@ public class GetPagedBottleTypesQueryHandler : IRequestHandler<GetPagedBottleTyp
                                      (x.Description != null && x.Description.ToLower().Contains(search)));
         }
 
+        if (request.Request.Status.HasValue)
+        {
+            bool isActive = request.Request.Status.Value == 1;
+            query = query.Where(x => x.IsActive == isActive);
+        }
+
         var totalCount = await query.CountAsync(cancellationToken);
 
         // Sorting

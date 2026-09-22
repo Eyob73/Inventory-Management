@@ -55,6 +55,24 @@ public class ProductsController : ControllerBase
         return Ok(product);
     }
 
+    [HttpGet("barcode/{barcode}")]
+    [EndpointSummary("Retrieve a product by Barcode")]
+    [EndpointDescription("Fetches detailed product information using its barcode for POS integration.")]
+    [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ProductDto>> GetByBarcode(string barcode, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var product = await _sender.Send(new GetProductByBarcodeQuery(barcode), cancellationToken);
+            return Ok(product);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
     [HttpPost]
     [Authorize(Roles = "Admin,Manager")]
     [EndpointSummary("Create a new product")]

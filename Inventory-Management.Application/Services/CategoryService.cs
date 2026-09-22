@@ -35,6 +35,7 @@ public class CategoryService : ICategoryService
                 Id = p.Id,
                 Name = p.Name,
                 SKU = p.SKU,
+                Barcode = p.Barcode,
                 Description = p.Description,
                 ImageUrl = p.ImageUrl,
                 Price = p.Price,

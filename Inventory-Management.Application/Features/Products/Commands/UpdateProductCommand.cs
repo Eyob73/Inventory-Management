@@ -42,6 +42,15 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         if (skuTaken)
             throw new ArgumentException($"A product with SKU '{sku}' already exists.");
 
+        string? barcode = string.IsNullOrWhiteSpace(dto.Barcode) ? null : dto.Barcode.Trim();
+        if (barcode != null)
+        {
+            var barcodeTaken = await _productRepository.Query()
+                .AnyAsync(p => p.Id != dto.Id && p.Barcode == barcode, cancellationToken);
+            if (barcodeTaken)
+                throw new ArgumentException($"A product with barcode '{barcode}' already exists.");
+        }
+
         if (dto.Image != null)
         {
             product.ImageUrl = await _fileStorageService.SaveProductImageAsync(dto.Image, product.ImageUrl);
@@ -61,6 +70,7 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
 
         product.Name = dto.Name;
         product.SKU = sku;
+        product.Barcode = barcode;
         product.Description = dto.Description ?? string.Empty;
         product.Price = dto.Price;
         product.Cost = dto.Cost;
@@ -81,6 +91,7 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             Id = product.Id,
             Name = product.Name,
             SKU = product.SKU,
+            Barcode = product.Barcode,
             Description = product.Description,
             ImageUrl = product.ImageUrl,
             Price = product.Price,
