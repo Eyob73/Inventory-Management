@@ -2,6 +2,7 @@ using Inventory_Management.Application.Features.BottleInventory.Commands;
 using Inventory_Management.Application.Features.BottleInventory.DTOs;
 using Inventory_Management.Application.Features.BottleInventory.Queries;
 using Inventory_Management.Application.DTOs.Common;
+using Inventory_Management.Api.Filters;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +12,7 @@ namespace Inventory_Management.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/[controller]")]
+[RequireBottleManagement]
 public class BottleInventoryController : ControllerBase
 {
     private readonly IMediator _mediator;

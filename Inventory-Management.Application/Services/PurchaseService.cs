@@ -19,6 +19,8 @@ public class PurchaseService : IPurchaseService
     private readonly INotificationService _notificationService;
     private readonly IGenericRepository<Inventory_Management.Domain.Entities.BottleInventory> _bottleInvRepo;
     private readonly IGenericRepository<BottleTransaction> _bottleTxRepo;
+    private readonly Inventory_Management.Application.Interfaces.Services.ICurrentTenant _currentTenant;
+    private readonly IGenericRepository<Tenant> _tenantRepo;
 
     public PurchaseService(
         IPurchaseRepository purchaseRepository,
@@ -29,7 +31,9 @@ public class PurchaseService : IPurchaseService
         IUnitOfWork unitOfWork,
         INotificationService notificationService,
         IGenericRepository<Inventory_Management.Domain.Entities.BottleInventory> bottleInvRepo,
-        IGenericRepository<BottleTransaction> bottleTxRepo)
+        IGenericRepository<BottleTransaction> bottleTxRepo,
+        Inventory_Management.Application.Interfaces.Services.ICurrentTenant currentTenant,
+        IGenericRepository<Tenant> tenantRepo)
     {
         _purchaseRepository = purchaseRepository;
         _purchaseItemRepository = purchaseItemRepository;
@@ -40,6 +44,8 @@ public class PurchaseService : IPurchaseService
         _notificationService = notificationService;
         _bottleInvRepo = bottleInvRepo;
         _bottleTxRepo = bottleTxRepo;
+        _currentTenant = currentTenant;
+        _tenantRepo = tenantRepo;
     }
 
     public async Task<PurchaseDto> GetByIdAsync(Guid id)
@@ -166,7 +172,17 @@ public class PurchaseService : IPurchaseService
                     $"Purchase {purchase.PurchaseNumber}",
                     createdBy);
 
-                if (item.Product != null && item.Product.IsReturnable && item.Product.BottleTypeId.HasValue)
+                var isBottleManagementEnabled = false;
+                if (_currentTenant.TenantId.HasValue)
+                {
+                    var tenant = await _tenantRepo.GetByIdAsync(_currentTenant.TenantId.Value);
+                    if (tenant != null)
+                    {
+                        isBottleManagementEnabled = tenant.EnableBottleManagement;
+                    }
+                }
+
+                if (isBottleManagementEnabled && item.Product != null && item.Product.IsReturnable && item.Product.BottleTypeId.HasValue)
                 {
                     var bInv = await _bottleInvRepo.Query().FirstOrDefaultAsync(x => x.BottleTypeId == item.Product.BottleTypeId.Value);
                     if (bInv == null) throw new InvalidOperationException($"Bottle inventory not found for type {item.Product.BottleTypeId}");
@@ -232,35 +248,45 @@ public class PurchaseService : IPurchaseService
                             foreach (var item in purchase.PurchaseItems)
             {
                 item.TotalCost = item.Quantity * item.UnitCost;
-                await _inventoryService.IncreaseStockAsync(
+                await _inventoryService.DecreaseStockAsync(
                     item.ProductId,
                     item.Quantity,
-                    InventoryTransactionType.Purchase,
+                    InventoryTransactionType.Adjustment, // or CancelPurchase if available
                     purchase.Id,
-                    "Purchase",
-                    $"Purchase {purchase.PurchaseNumber}",
+                    "Purchase Cancelled",
+                    $"Cancelled Purchase {purchase.PurchaseNumber}",
                     createdBy);
 
-                if (item.Product != null && item.Product.IsReturnable && item.Product.BottleTypeId.HasValue)
+                var isBottleManagementEnabled = false;
+                if (_currentTenant.TenantId.HasValue)
+                {
+                    var tenant = await _tenantRepo.GetByIdAsync(_currentTenant.TenantId.Value);
+                    if (tenant != null)
+                    {
+                        isBottleManagementEnabled = tenant.EnableBottleManagement;
+                    }
+                }
+
+                if (isBottleManagementEnabled && item.Product != null && item.Product.IsReturnable && item.Product.BottleTypeId.HasValue)
                 {
                     var bInv = await _bottleInvRepo.Query().FirstOrDefaultAsync(x => x.BottleTypeId == item.Product.BottleTypeId.Value);
                     if (bInv == null) throw new InvalidOperationException($"Bottle inventory not found for type {item.Product.BottleTypeId}");
 
-                    if (bInv.EmptyBottles < item.Quantity)
-                        throw new InvalidOperationException($"Not enough empty bottles for '{item.Product.Name}'. Required: {item.Quantity}, Available: {bInv.EmptyBottles}. Shortage: {item.Quantity - bInv.EmptyBottles}");
+                    if (bInv.FullBottles < item.Quantity)
+                        throw new InvalidOperationException($"Not enough full bottles to cancel for '{item.Product.Name}'. Required: {item.Quantity}, Available: {bInv.FullBottles}");
 
-                    bInv.EmptyBottles -= item.Quantity;
-                    bInv.FullBottles += item.Quantity;
+                    bInv.EmptyBottles += item.Quantity;
+                    bInv.FullBottles -= item.Quantity;
                     bInv.LastUpdatedAt = DateTime.UtcNow;
 
                     await _bottleTxRepo.AddAsync(new BottleTransaction
                     {
                         BottleTypeId = item.Product.BottleTypeId.Value,
-                        TransactionType = BottleTransactionType.Received,
-                        ReferenceType = "Purchase",
+                        TransactionType = BottleTransactionType.Adjustment,
+                        ReferenceType = "Purchase Cancelled",
                         ReferenceId = purchase.Id,
-                        Quantity = item.Quantity,
-                        Notes = $"Purchase {purchase.PurchaseNumber}",
+                        Quantity = item.Quantity, // might need to be negative depending on how Adjustment is handled, but usually Quantity is absolute
+                        Notes = $"Cancelled Purchase {purchase.PurchaseNumber}",
                         CreatedBy = createdBy,
                         CreatedAt = DateTime.UtcNow
                     });

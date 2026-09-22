@@ -9,4 +9,5 @@ public class UpdateMyTenantDto
     public string? Website { get; set; }
     public string? TaxId { get; set; }
     public int? LowStockThreshold { get; set; }
+    public bool? EnableBottleManagement { get; set; }
 }

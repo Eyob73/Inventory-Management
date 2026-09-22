@@ -28,18 +28,38 @@ public class ProcessSaleBottlesCommandHandler : IRequestHandler<ProcessSaleBottl
     private readonly IGenericRepository<BottleTransaction> _txRepo;
     private readonly IGenericRepository<CustomerBottleBalance> _balRepo;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly Inventory_Management.Application.Interfaces.Services.ICurrentTenant _currentTenant;
+    private readonly IGenericRepository<Tenant> _tenantRepo;
 
-    public ProcessSaleBottlesCommandHandler(IGenericRepository<Product> prodRepo, IGenericRepository<Inventory_Management.Domain.Entities.BottleInventory> invRepo, IGenericRepository<BottleTransaction> txRepo, IGenericRepository<CustomerBottleBalance> balRepo, IUnitOfWork unitOfWork)
+    public ProcessSaleBottlesCommandHandler(
+        IGenericRepository<Product> prodRepo, 
+        IGenericRepository<Inventory_Management.Domain.Entities.BottleInventory> invRepo, 
+        IGenericRepository<BottleTransaction> txRepo, 
+        IGenericRepository<CustomerBottleBalance> balRepo, 
+        IUnitOfWork unitOfWork,
+        Inventory_Management.Application.Interfaces.Services.ICurrentTenant currentTenant,
+        IGenericRepository<Tenant> tenantRepo)
     {
         _prodRepo = prodRepo;
         _invRepo = invRepo;
         _txRepo = txRepo;
         _balRepo = balRepo;
         _unitOfWork = unitOfWork;
+        _currentTenant = currentTenant;
+        _tenantRepo = tenantRepo;
     }
 
     public async Task<bool> Handle(ProcessSaleBottlesCommand request, CancellationToken cancellationToken)
     {
+        if (_currentTenant.TenantId.HasValue)
+        {
+            var tenant = await _tenantRepo.GetByIdAsync(_currentTenant.TenantId.Value);
+            if (tenant != null && !tenant.EnableBottleManagement)
+            {
+                return true;
+            }
+        }
+
         var productIds = request.Items.Select(x => x.ProductId).Distinct().ToList();
         var products = await _prodRepo.Query().Where(x => productIds.Contains(x.Id)).ToListAsync(cancellationToken);
 

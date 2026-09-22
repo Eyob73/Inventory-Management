@@ -33,6 +33,7 @@ public class GetMyTenantQueryHandler : IRequestHandler<GetMyTenantQuery, TenantD
             Website = tenant.Website,
             TaxId = tenant.TaxId,
             LowStockThreshold = tenant.LowStockThreshold,
+            EnableBottleManagement = tenant.EnableBottleManagement,
             IsActive = tenant.IsActive,
             Status = tenant.Status,
             CreatedAt = tenant.CreatedAt

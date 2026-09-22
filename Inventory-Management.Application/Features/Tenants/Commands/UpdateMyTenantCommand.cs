@@ -38,6 +38,11 @@ public class UpdateMyTenantCommandHandler : IRequestHandler<UpdateMyTenantComman
             tenant.LowStockThreshold = request.Dto.LowStockThreshold.Value;
         }
 
+        if (request.Dto.EnableBottleManagement.HasValue)
+        {
+            tenant.EnableBottleManagement = request.Dto.EnableBottleManagement.Value;
+        }
+
         await _repository.UpdateAsync(tenant);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -52,6 +57,7 @@ public class UpdateMyTenantCommandHandler : IRequestHandler<UpdateMyTenantComman
             Website = tenant.Website,
             TaxId = tenant.TaxId,
             LowStockThreshold = tenant.LowStockThreshold,
+            EnableBottleManagement = tenant.EnableBottleManagement,
             IsActive = tenant.IsActive,
             Status = tenant.Status,
             CreatedAt = tenant.CreatedAt

@@ -5,12 +5,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
+using Inventory_Management.Api.Filters;
 
 namespace Inventory_Management.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
+[RequireBottleManagement]
 public class BottleReportsController : ControllerBase
 {
     private readonly IMediator _mediator;
