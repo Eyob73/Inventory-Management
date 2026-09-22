@@ -26,26 +26,15 @@ public class GetPagedProductsQueryHandler : IRequestHandler<GetPagedProductsQuer
         var search = request.Search?.Trim().ToLower();
         var hasSearch = !string.IsNullOrWhiteSpace(search);
         var hasCategory = request.CategoryId.HasValue && request.CategoryId.Value != Guid.Empty;
+        var catId = request.CategoryId ?? Guid.Empty;
+        var filterLowStock = request.Status == 1;
+        var filterOutOfStock = request.Status == 2;
 
-        if (hasSearch && hasCategory)
-        {
-            var catId = request.CategoryId!.Value;
-            predicate = p => (p.Name.ToLower().Contains(search!)
-                           || p.SKU.ToLower().Contains(search!)
-                           || (p.Description != null && p.Description.ToLower().Contains(search!)))
-                          && p.CategoryId == catId;
-        }
-        else if (hasSearch)
-        {
-            predicate = p => p.Name.ToLower().Contains(search!)
-                           || p.SKU.ToLower().Contains(search!)
-                           || (p.Description != null && p.Description.ToLower().Contains(search!));
-        }
-        else if (hasCategory)
-        {
-            var catId = request.CategoryId!.Value;
-            predicate = p => p.CategoryId == catId;
-        }
+        predicate = p =>
+            (!hasSearch || p.Name.ToLower().Contains(search!) || p.SKU.ToLower().Contains(search!) || (p.Barcode != null && p.Barcode.ToLower().Contains(search!)) || (p.Description != null && p.Description.ToLower().Contains(search!)))
+            && (!hasCategory || p.CategoryId == catId)
+            && (!filterLowStock || (p.QuantityInStock > 0 && p.QuantityInStock <= 15))
+            && (!filterOutOfStock || p.QuantityInStock <= 0);
 
         Func<IQueryable<Product>, IOrderedQueryable<Product>>? orderBy = request.OrderBy switch
         {
