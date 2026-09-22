@@ -40,6 +40,11 @@ public class GetPagedBottleTransactionsQueryHandler : IRequestHandler<GetPagedBo
                                      (x.Customer != null && x.Customer.Name.ToLower().Contains(search)));
         }
 
+        if (request.Request.Status.HasValue)
+        {
+            query = query.Where(x => (int)x.TransactionType == request.Request.Status.Value);
+        }
+
         var totalCount = await query.CountAsync(cancellationToken);
 
         query = request.Request.Descending
