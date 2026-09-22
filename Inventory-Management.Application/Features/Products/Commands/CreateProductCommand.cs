@@ -45,6 +45,14 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         if (skuTaken)
             throw new ArgumentException($"A product with SKU '{sku}' already exists.");
 
+        string? barcode = string.IsNullOrWhiteSpace(dto.Barcode) ? null : dto.Barcode.Trim();
+        if (barcode != null)
+        {
+            var barcodeTaken = await _productRepository.Query().AnyAsync(p => p.Barcode == barcode, cancellationToken);
+            if (barcodeTaken)
+                throw new ArgumentException($"A product with barcode '{barcode}' already exists.");
+        }
+
         string? imageUrl = null;
         if (dto.Image != null)
         {
@@ -63,6 +71,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             Id = Guid.NewGuid(),
             Name = dto.Name,
             SKU = sku,
+            Barcode = barcode,
             Description = dto.Description ?? string.Empty,
             ImageUrl = imageUrl,
             Price = dto.Price,
@@ -102,6 +111,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         Id = p.Id,
         Name = p.Name,
         SKU = p.SKU,
+        Barcode = p.Barcode,
         Description = p.Description,
         ImageUrl = p.ImageUrl,
         Price = p.Price,

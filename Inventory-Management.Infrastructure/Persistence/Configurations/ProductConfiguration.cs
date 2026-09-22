@@ -26,6 +26,13 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         builder.HasIndex(p => p.SKU)
             .IsUnique();
 
+        builder.Property(p => p.Barcode)
+            .HasMaxLength(50);
+
+        builder.HasIndex(p => new { p.TenantId, p.Barcode })
+            .IsUnique()
+            .HasFilter("\"IsDeleted\" = false AND \"Barcode\" IS NOT NULL");
+
         builder.HasIndex(p => p.CategoryId);
         builder.HasIndex(p => p.SupplierId);
 
