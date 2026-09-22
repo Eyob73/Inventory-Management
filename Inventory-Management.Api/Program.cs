@@ -1,21 +1,242 @@
+using System.Text;
+using Inventory_Management.Api.Middleware;
+using Inventory_Management.Application.Interfaces.Repositories;
+using Inventory_Management.Application.Interfaces.Services;
+using Inventory_Management.Application.Services;
+using Inventory_Management.Infrastructure.Services;
+using Inventory_Management.Domain.Entities;
+using Inventory_Management.Infrastructure.Persistence.Data;
+using Inventory_Management.Infrastructure.Persistence.Repositories;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using Inventory_Management.Api;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+builder.Services.AddControllers();
+builder.Services.AddAuthorization();
+builder.Services.AddProblemDetails();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("ImsDbConnectionString")));
+
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? ["http://localhost:4200"];
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAngular", policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials()
+
+        .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
+    });
+});
+
+// Multi-Tenant Services
+builder.Services.AddScoped<ICurrentTenant, CurrentTenant>();
+
+// Repositories
+builder.Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
+builder.Services.AddScoped<ISaleRepository, SaleRepository>();
+builder.Services.AddScoped<IPurchaseRepository, PurchaseRepository>();
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Application Services & MediatR
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(CategoryService).Assembly));
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<ISupplierService, SupplierService>();
+builder.Services.AddScoped<ISaleService, SaleService>();
+builder.Services.AddScoped<ISaleItemService, SaleItemService>();
+builder.Services.AddScoped<IPurchaseService, PurchaseService>();
+builder.Services.AddScoped<IWebPushService, WebPushService>();
+builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+builder.Services.AddScoped<IPurchaseItemService, PurchaseItemService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<INotificationDispatcher, Inventory_Management.Api.Services.SignalRNotificationDispatcher>();
+builder.Services.AddSignalR();
+
+// Background Queuing
+builder.Services.AddSingleton<IBackgroundTaskQueue, Inventory_Management.Infrastructure.Services.BackgroundTaskQueue>();
+builder.Services.AddHostedService<Inventory_Management.Api.Services.BackgroundWorkerService>();
+
+builder.Services.AddIdentityCore<AppUser>(options =>
+{
+    // Enterprise Password Policy
+    options.Password.RequiredLength = 12;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireDigit = true;
+    options.Password.RequireNonAlphanumeric = true;
+    // Brute-Force Lockout Protection
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.AllowedForNewUsers = true;
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<AppDbContext>();
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme =
+    JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/notifications"))
+            {
+                context.Token = accessToken;
+            }
+            else if (context.Request.Cookies.TryGetValue("ims_auth", out var token))
+            {
+                context.Token = token;
+            }
+            return Task.CompletedTask;
+        }
+    };
+});
+
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-XSRF-TOKEN";
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json";
+
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            detail = "Too many requests. Please try again later."
+        }, cancellationToken: token);
+    };
+
+    options.AddFixedWindowLimiter("AuthLimiter", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+    });
+
+    options.AddConcurrencyLimiter("ExportLimiter", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.QueueLimit = 10;
+        opt.QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst;
+    });
+});
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    await DatabaseSeeder.SeedAsync(dbContext, userManager, roleManager);
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
-
 }
 
+app.UseStatusCodePages();
+
+app.UseMiddleware<RequestLoggingMiddleware>();
+
+app.Use(
+    async (context, next) =>
+    {
+        context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+        context.Response.Headers.Append("X-Frame-Options", "DENY");
+        context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+
+        var csp =
+            context.Request.Path.StartsWithSegments("/scalar")
+            || context.Request.Path.StartsWithSegments("/openapi")
+                ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';"
+                : "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self';";
+
+        context.Response.Headers.Append("Content-Security-Policy", csp);
+        await next();
+    }
+);
+
 app.UseHttpsRedirection();
+app.UseStaticFiles();
+
+app.UseRouting();
+
+app.UseRateLimiter();
+
+app.UseCors("AllowAngular");
+
+app.UseAuthentication();
+
+app.UseMiddleware<TenantResolverMiddleware>();
+
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true || context.Request.Cookies.ContainsKey("ims_auth"))
+    {
+        var antiforgery = context.RequestServices.GetRequiredService<IAntiforgery>();
+        var tokens = antiforgery.GetAndStoreTokens(context);
+        context.Response.Cookies.Append("XSRF-TOKEN", tokens.RequestToken!, new CookieOptions
+        {
+            HttpOnly = false,
+            Secure = !builder.Environment.IsDevelopment(),
+            SameSite = SameSiteMode.Strict,
+        });
+    }
+
+    await next(context);
+});
+
+app.UseAuthorization();
+
+app.MapControllers();
+app.MapHub<Inventory_Management.Api.Hubs.NotificationHub>("/hubs/notifications");
+
+app.MapGet("/api/error", () =>
+{
+    throw new Exception("Simulated database failure for ProblemDetails testing");
+});
 
 app.Run();

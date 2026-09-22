@@ -1,0 +1,35 @@
+using Inventory_Management.Domain.Common;
+
+namespace Inventory_Management.Domain.Entities;
+
+public class Product : IMultiTenant, ISoftDelete
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid? TenantId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string SKU { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string? ImageUrl { get; set; }
+    public decimal Price { get; set; }
+    public decimal Cost { get; set; }
+    public int QuantityInStock { get; set; }
+    public int MinimumStock { get; set; }
+    public bool IsActive { get; set; } = true;
+    public bool IsDeleted { get; set; }
+    public DateTime? DeletedAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+
+    public Guid? BottleTypeId { get; set; }
+    public BottleType? BottleType { get; set; }
+    public bool IsReturnable { get; set; }
+    public decimal BottleDepositAmount { get; set; }
+    public Guid CategoryId { get; set; }
+    public Category? Category { get; set; }
+
+    public Guid? SupplierId { get; set; }
+    public Supplier? Supplier { get; set; }
+
+    public ICollection<PurchaseItem> PurchaseItems { get; set; } = new List<PurchaseItem>();
+    public ICollection<InventoryTransaction> InventoryTransactions { get; set; } = new List<InventoryTransaction>();
+}
