@@ -144,4 +144,36 @@ public class AuthController : ControllerBase
 
         return Ok(new { message = "Password updated successfully." });
     }
+
+    [HttpPost("forgot-password")]
+    [EnableRateLimiting("AuthLimiter")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequestDto request)
+    {
+        var origin = Request.Headers["Origin"].FirstOrDefault();
+        if (string.IsNullOrEmpty(origin))
+        {
+            var allowedOrigins = _env.IsDevelopment() ? new[] { "http://localhost:4200" } : new[] { "https://your-frontend-domain.com" }; // Usually pulled from config
+            origin = allowedOrigins[0];
+        }
+
+        await _authService.ForgotPasswordAsync(request, origin);
+        
+        // Return a generic success response to prevent account enumeration
+        return Ok(new { message = "If an account exists for this email address, you will receive a password reset link shortly." });
+    }
+
+    [HttpPost("reset-password")]
+    [EnableRateLimiting("AuthLimiter")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequestDto request)
+    {
+        var (success, errors) = await _authService.ResetPasswordAsync(request);
+        if (!success)
+        {
+            // For security, don't indicate if the token is invalid or expired vs wrong email.
+            // But we can return a generic 400 with the errors.
+            return BadRequest(new { message = "This password reset link is invalid or has expired.", errors });
+        }
+
+        return Ok(new { message = "Password reset successfully." });
+    }
 }

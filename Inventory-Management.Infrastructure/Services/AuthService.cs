@@ -14,17 +14,20 @@ public class AuthService : IAuthService
     private readonly RoleManager<IdentityRole> _roleManager;
     private readonly AppDbContext _context;
     private readonly TokenService _tokenService;
+    private readonly IEmailService _emailService;
 
     public AuthService(
         UserManager<AppUser> userManager,
         RoleManager<IdentityRole> roleManager,
         AppDbContext context,
-        TokenService tokenService)
+        TokenService tokenService,
+        IEmailService emailService)
     {
         _userManager = userManager;
         _roleManager = roleManager;
         _context = context;
         _tokenService = tokenService;
+        _emailService = emailService;
     }
 
     public async Task<(bool Success, IEnumerable<string>? Errors, bool AlreadyExists)> RegisterAsync(RegisterRequestDto request)
@@ -185,5 +188,60 @@ public class AuthService : IAuthService
 
         var newAccessToken = _tokenService.GenerateJwt(user, roles, tenantName);
         return (newAccessToken, newRefreshToken.Token);
+    }
+
+    public async Task ForgotPasswordAsync(ForgotPasswordRequestDto request, string clientUri)
+    {
+        var user = await _userManager.FindByEmailAsync(request.Email);
+        if (user == null)
+        {
+            // Do not reveal whether user exists for security (prevent account enumeration)
+            return;
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var encodedToken = System.Web.HttpUtility.UrlEncode(token);
+        
+        // Use standard URI building or string formatting
+        var resetLink = $"{clientUri.TrimEnd('/')}/reset-password?token={encodedToken}&email={System.Web.HttpUtility.UrlEncode(user.Email)}";
+
+        var subject = "Reset your password";
+        var body = $@"
+<p>We received a request to reset the password for your account.</p>
+<p><a href='{resetLink}'>Reset Password</a></p>
+<p>This link will expire in 30 minutes.</p>
+<p>If you did not request a password reset, you can safely ignore this email.</p>";
+
+        await _emailService.SendEmailAsync(user.Email!, subject, body);
+    }
+
+    public async Task<(bool Success, IEnumerable<string>? Errors)> ResetPasswordAsync(ResetPasswordRequestDto request)
+    {
+        var user = await _userManager.FindByEmailAsync(request.Email);
+        if (user == null)
+        {
+            // For security, don't indicate if the user doesn't exist
+            return (false, new[] { "Invalid or expired reset link." });
+        }
+
+        var result = await _userManager.ResetPasswordAsync(user, request.Token, request.NewPassword);
+
+        if (!result.Succeeded)
+        {
+            return (false, result.Errors.Select(e => e.Description));
+        }
+
+        // Revoke all existing refresh tokens
+        var userTokens = await _context.RefreshTokens
+            .Where(rt => rt.UserId == user.Id && !rt.IsRevoked)
+            .ToListAsync();
+            
+        foreach (var t in userTokens)
+        {
+            t.IsRevoked = true;
+        }
+        await _context.SaveChangesAsync();
+
+        return (true, null);
     }
 }
