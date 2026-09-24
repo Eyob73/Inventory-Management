@@ -117,7 +117,7 @@ public class ProcessSaleBottlesCommandHandler : IRequestHandler<ProcessSaleBottl
                     CustomerId = request.CustomerId,
                     TransactionType = BottleTransactionType.Issued,
                     Quantity = item.Quantity,
-                    DepositAmount = item.BottleDepositAmount, // Using actual deposit provided
+                    DepositAmount = item.BottleDepositAmount * item.Quantity, // Store total deposit amount
                     ReferenceType = "Sale",
                     ReferenceId = request.SaleId,
                     CreatedBy = request.User,
