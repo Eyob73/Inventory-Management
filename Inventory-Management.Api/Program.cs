@@ -68,6 +68,7 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationDispatcher, Inventory_Management.Api.Services.SignalRNotificationDispatcher>();
+builder.Services.AddScoped<IEmailService, Inventory_Management.Infrastructure.Services.EmailService>();
 builder.Services.AddSignalR();
 
 // Background Queuing
@@ -87,7 +88,8 @@ builder.Services.AddIdentityCore<AppUser>(options =>
     options.Lockout.AllowedForNewUsers = true;
 })
 .AddRoles<IdentityRole>()
-.AddEntityFrameworkStores<AppDbContext>();
+.AddEntityFrameworkStores<AppDbContext>()
+.AddDefaultTokenProviders();
 
 builder.Services.AddAuthentication(options =>
 {

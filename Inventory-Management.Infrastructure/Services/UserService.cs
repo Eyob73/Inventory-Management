@@ -149,6 +149,10 @@ public class UserService : IUserService
         user.PhoneNumber = dto.PhoneNumber;
         if (dto.TenantId.HasValue)
         {
+            if (dto.TenantId.Value == Guid.Empty)
+            {
+                return (false, null, new[] { "Invalid Tenant ID. Cannot be an empty GUID." });
+            }
             user.TenantId = dto.TenantId;
         }
 
