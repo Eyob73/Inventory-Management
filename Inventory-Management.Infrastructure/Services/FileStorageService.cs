@@ -1,18 +1,26 @@
+using CloudinaryDotNet;
+using CloudinaryDotNet.Actions;
 using Inventory_Management.Application.Interfaces.Services;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 
 namespace Inventory_Management.Infrastructure.Services;
 
 public class FileStorageService : IFileStorageService
 {
-    private readonly IWebHostEnvironment _environment;
+    private readonly Cloudinary _cloudinary;
     private readonly string[] _allowedExtensions = { ".jpg", ".jpeg", ".png", ".webp" };
     private const long MaxFileSize = 5 * 1024 * 1024; // 5 MB
 
-    public FileStorageService(IWebHostEnvironment environment)
+    public FileStorageService(IConfiguration config)
     {
-        _environment = environment;
+        // Read from appsettings if available, fallback to hardcoded for simplicity
+        var cloudName = config["Cloudinary:CloudName"] ?? "rnlfawky";
+        var apiKey = config["Cloudinary:ApiKey"] ?? "368673597326217";
+        var apiSecret = config["Cloudinary:ApiSecret"] ?? "7T3NWgGXFnDkpavuTzZoKqO0vu4";
+
+        var account = new Account(cloudName, apiKey, apiSecret);
+        _cloudinary = new Cloudinary(account);
     }
 
     public async Task<string> SaveProductImageAsync(IFormFile image, string? oldImageUrl = null)
@@ -27,51 +35,65 @@ public class FileStorageService : IFileStorageService
         if (!_allowedExtensions.Contains(ext))
             throw new ArgumentException("Invalid image format. Allowed formats are: JPG, JPEG, PNG, WEBP.");
 
-        var fileName = $"{Guid.NewGuid()}{ext}";
-        var webRootPath = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
-        var uploadFolder = Path.Combine(webRootPath, "uploads", "products");
-
-        if (!Directory.Exists(uploadFolder))
-        {
-            Directory.CreateDirectory(uploadFolder);
-        }
-
-        var filePath = Path.Combine(uploadFolder, fileName);
-
-        using (var stream = new FileStream(filePath, FileMode.Create))
-        {
-            await image.CopyToAsync(stream);
-        }
-
         if (!string.IsNullOrEmpty(oldImageUrl))
         {
             DeleteProductImage(oldImageUrl);
         }
 
-        return $"/uploads/products/{fileName}";
+        using var stream = image.OpenReadStream();
+        var uploadParams = new ImageUploadParams
+        {
+            File = new FileDescription(image.FileName, stream),
+            Folder = "products",
+            // You can optionally add transformations here, e.g. resizing
+            // Transformation = new Transformation().Width(800).Height(800).Crop("limit")
+        };
+
+        var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+
+        if (uploadResult.Error != null)
+        {
+            throw new Exception($"Image upload failed: {uploadResult.Error.Message}");
+        }
+
+        return uploadResult.SecureUrl.ToString();
     }
 
     public void DeleteProductImage(string imageUrl)
     {
         if (string.IsNullOrEmpty(imageUrl)) return;
 
-        // Ensure we only process relative URLs inside the expected folder
-        if (!imageUrl.StartsWith("/uploads/products/")) return;
-
-        var webRootPath = _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot");
-        var fileName = Path.GetFileName(imageUrl);
-        var filePath = Path.Combine(webRootPath, "uploads", "products", fileName);
-
-        if (File.Exists(filePath))
+        try
         {
-            try
+            var publicId = GetPublicIdFromUrl(imageUrl);
+            
+            if (!string.IsNullOrEmpty(publicId))
             {
-                File.Delete(filePath);
-            }
-            catch
-            {
-                // Optionally log the error, but don't crash if file deletion fails
+                var deletionParams = new DeletionParams(publicId);
+                _cloudinary.Destroy(deletionParams);
             }
         }
+        catch
+        {
+            // Optionally log the error, but don't crash if file deletion fails
+        }
+    }
+
+    private string? GetPublicIdFromUrl(string url)
+    {
+        if (string.IsNullOrEmpty(url)) return null;
+
+        // Try to find the folder if it exists in the URL to extract the public ID
+        var folderPrefix = "products/";
+        var folderIndex = url.IndexOf(folderPrefix);
+
+        if (folderIndex != -1)
+        {
+            var publicIdWithExt = url.Substring(folderIndex);
+            var dotIndex = publicIdWithExt.LastIndexOf('.');
+            return dotIndex != -1 ? publicIdWithExt.Substring(0, dotIndex) : publicIdWithExt;
+        }
+
+        return null;
     }
 }
