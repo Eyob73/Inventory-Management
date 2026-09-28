@@ -22,6 +22,10 @@ RUN dotnet publish "Inventory-Management.Api.csproj" -c Release -o /app/publish 
 # Stage 3: Run
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
+
+# Install Kerberos library to prevent Npgsql from crashing (Error 139 / libgssapi_krb5.so.2)
+RUN apt-get update && apt-get install -y libgssapi-krb5-2 && rm -rf /var/lib/apt/lists/*
+
 COPY --from=publish /app/publish .
 
 # Render assigns a port dynamically via the PORT environment variable.
