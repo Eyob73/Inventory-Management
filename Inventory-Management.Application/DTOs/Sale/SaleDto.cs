@@ -19,6 +19,9 @@ public class SaleDto
     public decimal TaxAmount { get; set; }
     public decimal TotalAmount { get; set; }
 
+    public decimal TotalBottleDeposit { get; set; }
+    public decimal AdditionalBottleDeposit { get; set; }
+
     public string PaymentMethod { get; set; } = "Cash";
     public decimal AmountReceived { get; set; }
     public decimal ChangeAmount { get; set; }

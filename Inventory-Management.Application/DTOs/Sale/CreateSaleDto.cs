@@ -10,6 +10,7 @@ public class CreateSaleDto
     public decimal AmountReceived { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal TaxAmount { get; set; }
+    public decimal AdditionalBottleDeposit { get; set; }
     public string? Notes { get; set; }
     public List<CreateSaleItemDto> Items { get; set; } = new();
 }
