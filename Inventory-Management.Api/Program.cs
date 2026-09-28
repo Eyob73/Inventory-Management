@@ -60,18 +60,6 @@ builder.Services.AddScoped<ISaleItemService, SaleItemService>();
 builder.Services.AddScoped<IPurchaseService, PurchaseService>();
 builder.Services.AddScoped<IWebPushService, WebPushService>();
 
-var supabaseUrl = builder.Configuration["Supabase:Url"] ?? Environment.GetEnvironmentVariable("SUPABASE_URL");
-var supabaseKey = builder.Configuration["Supabase:Key"] ?? Environment.GetEnvironmentVariable("SUPABASE_KEY");
-if (!string.IsNullOrEmpty(supabaseUrl) && !string.IsNullOrEmpty(supabaseKey))
-{
-    var options = new Supabase.SupabaseOptions
-    {
-        AutoConnectRealtime = false
-    };
-    var supabaseClient = new Supabase.Client(supabaseUrl, supabaseKey, options);
-    builder.Services.AddSingleton(supabaseClient);
-}
-
 builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<IPurchaseItemService, PurchaseItemService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
