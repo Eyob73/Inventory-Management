@@ -141,7 +141,8 @@ public class SaleService : ISaleService
             sale.Subtotal = subtotal;
             sale.DiscountAmount = Math.Max(0m, dto.DiscountAmount);
             sale.TaxAmount = Math.Max(0m, dto.TaxAmount);
-            sale.TotalAmount = Math.Max(0m, subtotal - sale.DiscountAmount + sale.TaxAmount);
+            sale.AdditionalBottleDeposit = Math.Max(0m, dto.AdditionalBottleDeposit);
+            sale.TotalAmount = Math.Max(0m, subtotal - sale.DiscountAmount + sale.TaxAmount + sale.AdditionalBottleDeposit);
             sale.AmountReceived = dto.AmountReceived;
             sale.ChangeAmount = sale.PaymentMethod.Equals("Cash", StringComparison.OrdinalIgnoreCase)
                 ? Math.Max(0m, dto.AmountReceived - sale.TotalAmount)
@@ -157,6 +158,7 @@ public class SaleService : ISaleService
                 SaleId = sale.Id,
                 CustomerId = sale.CustomerId,
                 User = cashierName ?? userId ?? "System",
+                AdditionalBottleDeposit = sale.AdditionalBottleDeposit,
                 Items = dto.Items.Select(x => new Inventory_Management.Application.Features.Sales.Commands.ProcessSaleBottleItem
                 {
                     ProductId = x.ProductId,
@@ -259,6 +261,8 @@ public class SaleService : ISaleService
         Subtotal = s.Subtotal,
         DiscountAmount = s.DiscountAmount,
         TaxAmount = s.TaxAmount,
+        AdditionalBottleDeposit = s.AdditionalBottleDeposit,
+        TotalBottleDeposit = s.SaleItems.Sum(si => si.BottleDepositAmount * si.Quantity),
         TotalAmount = s.TotalAmount,
         PaymentMethod = s.PaymentMethod,
         AmountReceived = s.AmountReceived,

@@ -18,6 +18,7 @@ public class ProcessSaleBottlesCommand : IRequest<bool>
     public Guid SaleId { get; set; }
     public Guid? CustomerId { get; set; }
     public string User { get; set; } = string.Empty;
+    public decimal AdditionalBottleDeposit { get; set; }
     public List<ProcessSaleBottleItem> Items { get; set; } = new();
 }
 
@@ -108,7 +109,15 @@ public class ProcessSaleBottlesCommandHandler : IRequestHandler<ProcessSaleBottl
                     await _balRepo.AddAsync(balance);
                 }
                 balance.Balance += item.Quantity;
-                balance.TotalDeposit += (item.Quantity * item.BottleDepositAmount);
+                
+                decimal itemTotalDeposit = (item.Quantity * item.BottleDepositAmount);
+                if (request.AdditionalBottleDeposit > 0)
+                {
+                    itemTotalDeposit += request.AdditionalBottleDeposit;
+                    request.AdditionalBottleDeposit = 0; // Only add to the first applicable item
+                }
+
+                balance.TotalDeposit += itemTotalDeposit;
                 balance.LastUpdatedAt = DateTime.UtcNow;
                 
                 await _txRepo.AddAsync(new BottleTransaction
@@ -117,7 +126,7 @@ public class ProcessSaleBottlesCommandHandler : IRequestHandler<ProcessSaleBottl
                     CustomerId = request.CustomerId,
                     TransactionType = BottleTransactionType.Issued,
                     Quantity = item.Quantity,
-                    DepositAmount = item.BottleDepositAmount * item.Quantity, // Store total deposit amount
+                    DepositAmount = itemTotalDeposit, // Store total deposit amount including additional
                     ReferenceType = "Sale",
                     ReferenceId = request.SaleId,
                     CreatedBy = request.User,
