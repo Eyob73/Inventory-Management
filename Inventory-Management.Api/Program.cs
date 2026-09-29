@@ -225,7 +225,7 @@ app.Use(async (context, next) =>
         {
             HttpOnly = false,
             Secure = !builder.Environment.IsDevelopment(),
-            SameSite = SameSiteMode.Strict,
+            SameSite = SameSiteMode.None,
         });
     }
 
