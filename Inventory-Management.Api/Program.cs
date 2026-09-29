@@ -194,8 +194,8 @@ app.Use(
         var csp =
             context.Request.Path.StartsWithSegments("/scalar")
             || context.Request.Path.StartsWithSegments("/openapi")
-                ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self';"
-                : "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self';";
+                ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.supabase.co; connect-src 'self';"
+                : "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://*.supabase.co; connect-src 'self';";
 
         context.Response.Headers.Append("Content-Security-Policy", csp);
         await next();
