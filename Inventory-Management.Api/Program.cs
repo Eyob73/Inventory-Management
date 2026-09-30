@@ -180,6 +180,8 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
+app.UseExceptionHandler();
+
 app.UseStatusCodePages();
 
 app.UseMiddleware<RequestLoggingMiddleware>();
