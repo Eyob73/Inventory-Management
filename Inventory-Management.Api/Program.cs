@@ -249,6 +249,12 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<Inventory_Management.Api.Hubs.NotificationHub>("/hubs/notifications");
 
+app.MapGet("/api/health", () => Results.Ok(new
+{
+    status = "Healthy",
+    timestamp = DateTime.UtcNow
+})).AllowAnonymous();
+
 app.MapGet("/api/error", () =>
 {
     throw new Exception("Simulated database failure for ProblemDetails testing");
