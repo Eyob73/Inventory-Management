@@ -130,7 +130,7 @@ public static class PdfReportGenerator
 
                     left.Item()
                         .PaddingTop(2)
-                        .Text("Inventory Management System")
+                        .Text("TrackStack")
                         .FontSize(7.5f)
                         .FontColor(MutedText);
                 });
@@ -365,7 +365,7 @@ public static class PdfReportGenerator
                                             .FontColor(MutedText);
 
                                         text.Span(
-                                                "  •  Inventory Management System")
+                                                "  •  TrackStack")
                                             .FontSize(7)
                                             .FontColor(MutedText);
                                     });

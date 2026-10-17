@@ -138,7 +138,7 @@ public class ReportsController : ControllerBase
     {
         try
         {
-            var tenantName = User.FindFirstValue("TenantName") ?? "Inventory Management System";
+            var tenantName = User.FindFirstValue("TenantName") ?? "TrackStack";
             var userName = User.FindFirstValue(ClaimTypes.Name) ?? "System User";
             var file = await _reports.ExportCompositeAsync(tenantName, userName, filter, format, cancellationToken);
             return File(file.Content, file.ContentType, file.FileName);

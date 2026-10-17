@@ -62,10 +62,10 @@ public class InventoryReportDocument : IDocument
     {
         return new DocumentMetadata
         {
-            Title = "Inventory Management Report",
+            Title = "TrackStack Inventory Report",
             Author = _tenantName,
             Subject = $"Inventory Report {_start:dd MMM yyyy} - {_end:dd MMM yyyy}",
-            Creator = "Inventory Management System",
+            Creator = "TrackStack",
             Keywords = "Inventory, Sales, Purchases, Report"
         };
     }
@@ -117,7 +117,7 @@ public class InventoryReportDocument : IDocument
                 {
                     left.Item()
                         .Text(string.IsNullOrWhiteSpace(_tenantName)
-                            ? "INVENTORY MANAGEMENT"
+                            ? "TRACKSTACK"
                             : _tenantName.ToUpper())
                         .FontSize(11)
                         .Bold()
@@ -203,7 +203,7 @@ public class InventoryReportDocument : IDocument
             {
                 cover.Item()
                     .AlignCenter()
-                    .Text("INVENTORY MANAGEMENT")
+                    .Text("TRACKSTACK")
                     .FontSize(10)
                     .Bold()
                     .FontColor(Primary);
@@ -1242,7 +1242,7 @@ public class InventoryReportDocument : IDocument
                         row.RelativeItem()
                             .Text(text =>
                             {
-                                text.Span("Inventory Management System")
+                                text.Span("TrackStack")
                                     .FontSize(7)
                                     .FontColor(MutedText);
 
