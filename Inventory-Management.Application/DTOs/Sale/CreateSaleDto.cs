@@ -13,4 +13,7 @@ public class CreateSaleDto
     public decimal AdditionalBottleDeposit { get; set; }
     public string? Notes { get; set; }
     public List<CreateSaleItemDto> Items { get; set; } = new();
+
+    public Guid? PaymentVerificationId { get; set; }
+    public bool VerificationSkipped { get; set; }
 }
