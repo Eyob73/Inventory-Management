@@ -14,6 +14,7 @@ public class TenantDto
     public string? TaxId { get; set; }
     public int LowStockThreshold { get; set; }
     public bool EnableBottleManagement { get; set; }
+    public bool PosPaymentVerificationEnabled { get; set; }
     public bool IsActive { get; set; }
     public TenantStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }

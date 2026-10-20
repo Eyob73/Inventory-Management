@@ -43,6 +43,11 @@ public class UpdateMyTenantCommandHandler : IRequestHandler<UpdateMyTenantComman
             tenant.EnableBottleManagement = request.Dto.EnableBottleManagement.Value;
         }
 
+        if (request.Dto.PosPaymentVerificationEnabled.HasValue)
+        {
+            tenant.PosPaymentVerificationEnabled = request.Dto.PosPaymentVerificationEnabled.Value;
+        }
+
         await _repository.UpdateAsync(tenant);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
@@ -58,6 +63,7 @@ public class UpdateMyTenantCommandHandler : IRequestHandler<UpdateMyTenantComman
             TaxId = tenant.TaxId,
             LowStockThreshold = tenant.LowStockThreshold,
             EnableBottleManagement = tenant.EnableBottleManagement,
+            PosPaymentVerificationEnabled = tenant.PosPaymentVerificationEnabled,
             IsActive = tenant.IsActive,
             Status = tenant.Status,
             CreatedAt = tenant.CreatedAt
