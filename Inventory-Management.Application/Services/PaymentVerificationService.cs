@@ -50,8 +50,33 @@ public class PaymentVerificationService : IPaymentVerificationService
         if (dto.PaymentDestinationId == Guid.Empty)
             throw new ArgumentException("A valid payment destination must be selected.", nameof(dto.PaymentDestinationId));
 
+        if (string.IsNullOrWhiteSpace(dto.SubmittedReference) && !string.IsNullOrWhiteSpace(dto.QrData))
+        {
+            dto.SubmittedReference = PaymentDestinationSecurity.NormalizeReference(dto.QrData);
+        }
+
         if (string.IsNullOrWhiteSpace(dto.SubmittedReference))
             throw new ArgumentException("Transaction reference or receipt link is required.", nameof(dto.SubmittedReference));
+
+        // SSRF protection and banking domain validation for receipt URLs
+        if (dto.SubmittedReference.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            dto.SubmittedReference.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!PaymentDestinationSecurity.ValidateReceiptUrl(dto.SubmittedReference, out var ssrfError))
+            {
+                throw new ArgumentException(ssrfError ?? "Invalid receipt URL format or unauthorized banking domain.", nameof(dto.SubmittedReference));
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.QrData) &&
+            (dto.QrData.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+             dto.QrData.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (!PaymentDestinationSecurity.ValidateReceiptUrl(dto.QrData, out var qrSsrfError))
+            {
+                throw new ArgumentException(qrSsrfError ?? "Invalid receipt QR URL format or unauthorized banking domain.", nameof(dto.QrData));
+            }
+        }
 
         Sale? sale = null;
         decimal expectedAmount = 0m;

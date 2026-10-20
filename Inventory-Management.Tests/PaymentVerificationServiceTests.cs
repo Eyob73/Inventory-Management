@@ -498,4 +498,122 @@ public class PaymentVerificationServiceTests
 
         _verifRepoMock.Verify(r => r.AddAsync(It.IsAny<PaymentVerification>()), Times.Once);
     }
+
+    [Fact]
+    public async Task VerifyCustomerPayment_WithScannedCbeReceiptUrl_PassesNormalizedReferenceAndQrData()
+    {
+        // Arrange
+        var sale = CreateTestSale(totalAmount: 1500m);
+        var dest = CreateTestDestination();
+
+        _saleRepositoryMock.Setup(r => r.Query())
+            .Returns(new List<Sale> { sale }.AsAsyncQueryable());
+        _destRepoMock.Setup(r => r.Query())
+            .Returns(new List<PaymentDestination> { dest }.AsAsyncQueryable());
+        _verifRepoMock.Setup(r => r.Query()).Returns(new List<PaymentVerification>().AsAsyncQueryable());
+
+        var chekiResponse = new ChekiVerifyResponse
+        {
+            Success = true,
+            Verified = true,
+            Amount = 1500m,
+            Currency = "ETB",
+            ReceiverAccount = "1000****6789",
+            ReceiverName = "Primary CBE Account",
+            Date = DateTime.UtcNow.ToString("o")
+        };
+
+        ChekiVerifyRequest? capturedChekiRequest = null;
+        _chekiServiceMock.Setup(c => c.VerifyPaymentAsync(It.IsAny<ChekiVerifyRequest>(), It.IsAny<CancellationToken>()))
+            .Callback<ChekiVerifyRequest, CancellationToken>((req, _) => capturedChekiRequest = req)
+            .ReturnsAsync(chekiResponse);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        const string scannedUrl = "https://apps.cbe.com.et:4130/receipt?ref=FT2409876543&amount=1500";
+        var request = new VerifyPaymentRequestDto
+        {
+            SaleId = _testSaleId,
+            PaymentDestinationId = _testDestId,
+            SubmittedReference = scannedUrl,
+            QrData = scannedUrl
+        };
+
+        // Act
+        var result = await _service.VerifyCustomerPaymentAsync(request, "user-1", "Cashier John");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(PaymentVerificationStatus.Verified, result.Status);
+        Assert.Equal("FT2409876543", result.VerifiedReference);
+        Assert.NotNull(capturedChekiRequest);
+        Assert.Equal(scannedUrl, capturedChekiRequest.Reference);
+        Assert.Equal(scannedUrl, capturedChekiRequest.QrData);
+    }
+
+    [Fact]
+    public async Task VerifyCustomerPayment_UntrustedDomainInReceiptUrl_ThrowsArgumentExceptionForSsrfProtection()
+    {
+        // Arrange
+        var request = new VerifyPaymentRequestDto
+        {
+            SaleId = _testSaleId,
+            PaymentDestinationId = _testDestId,
+            SubmittedReference = "https://untrusted-hacker-site.com/receipt?ref=FT12345"
+        };
+
+        // Act & Assert
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            _service.VerifyCustomerPaymentAsync(request, "user-1", "Cashier John"));
+
+        Assert.Contains("not a recognized Ethiopian banking", ex.Message);
+    }
+
+    [Fact]
+    public async Task VerifyCustomerPayment_EmptySubmittedReferenceWithValidQrData_ExtractsReferenceFromQrData()
+    {
+        // Arrange
+        var sale = CreateTestSale(totalAmount: 1500m);
+        var dest = CreateTestDestination();
+
+        _saleRepositoryMock.Setup(r => r.Query())
+            .Returns(new List<Sale> { sale }.AsAsyncQueryable());
+        _destRepoMock.Setup(r => r.Query())
+            .Returns(new List<PaymentDestination> { dest }.AsAsyncQueryable());
+        _verifRepoMock.Setup(r => r.Query()).Returns(new List<PaymentVerification>().AsAsyncQueryable());
+
+        var chekiResponse = new ChekiVerifyResponse
+        {
+            Success = true,
+            Verified = true,
+            Amount = 1500m,
+            Currency = "ETB",
+            ReceiverAccount = "1000****6789"
+        };
+
+        _chekiServiceMock.Setup(c => c.VerifyPaymentAsync(It.IsAny<ChekiVerifyRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(chekiResponse);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        const string scannedUrl = "https://mb.cbe.com.et/receipt?ref=FT2401122334";
+        var request = new VerifyPaymentRequestDto
+        {
+            SaleId = _testSaleId,
+            PaymentDestinationId = _testDestId,
+            SubmittedReference = "", // empty reference, QR provided
+            QrData = scannedUrl
+        };
+
+        // Act
+        var result = await _service.VerifyCustomerPaymentAsync(request, "user-1", "Cashier John");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(PaymentVerificationStatus.Verified, result.Status);
+        Assert.Equal("FT2401122334", result.VerifiedReference);
+    }
 }
+
