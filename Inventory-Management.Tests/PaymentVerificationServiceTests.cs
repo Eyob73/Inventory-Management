@@ -615,5 +615,63 @@ public class PaymentVerificationServiceTests
         Assert.Equal(PaymentVerificationStatus.Verified, result.Status);
         Assert.Equal("FT2401122334", result.VerifiedReference);
     }
+
+    [Fact]
+    public async Task VerifyCustomerPayment_TelebirrCloudIpBlock_SetsNeedsManualReviewAndProvidesReceiptUrl()
+    {
+        // Arrange
+        var sale = CreateTestSale(totalAmount: 1200m);
+        var dest = new PaymentDestination
+        {
+            Id = Guid.NewGuid(),
+            TenantId = _testTenantId,
+            Name = "Merchant Telebirr",
+            Type = PaymentDestinationType.Telebirr,
+            BankCode = "TELEBIRR",
+            BankName = "Telebirr",
+            PhoneNumber = "+251911223344",
+            IsActive = true
+        };
+
+        _saleRepositoryMock.Setup(r => r.Query())
+            .Returns(new List<Sale> { sale }.AsAsyncQueryable());
+        _destRepoMock.Setup(r => r.Query())
+            .Returns(new List<PaymentDestination> { dest }.AsAsyncQueryable());
+        _verifRepoMock.Setup(r => r.Query())
+            .Returns(new List<PaymentVerification>().AsAsyncQueryable());
+
+        var chekiResponse = new ChekiVerifyResponse
+        {
+            Success = false,
+            Verified = false,
+            StatusCode = 503,
+            Error = "[Telebirr] Our server can't reach this bank (it blocks cloud IPs). Open the receipt directly: Try the new receipt format: https://transactioninfo.ethiotelecom.et/receipt/DJ22CCOK68"
+        };
+
+        _chekiServiceMock.Setup(c => c.VerifyPaymentAsync(It.IsAny<ChekiVerifyRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(chekiResponse);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var request = new VerifyPaymentRequestDto
+        {
+            SaleId = _testSaleId,
+            PaymentDestinationId = dest.Id,
+            SubmittedReference = "DJ22CCOK68"
+        };
+
+        // Act
+        var result = await _service.VerifyCustomerPaymentAsync(request, "user-1", "Cashier John");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(PaymentVerificationStatus.NeedsManualReview, result.Status);
+        Assert.True(result.NeedsManualReview);
+        Assert.False(result.IsEligibleForRetry);
+        Assert.False(result.SaleUpdated);
+        Assert.Equal("TELEBIRR_DIRECT_VERIFICATION_REQUIRED", result.FailureCode);
+        Assert.Equal("https://transactioninfo.ethiotelecom.et/receipt/DJ22CCOK68", result.SourceUrl);
+    }
 }
 

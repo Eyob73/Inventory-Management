@@ -81,6 +81,8 @@ public class VerifyPaymentResponseDto
     public bool SaleUpdated { get; set; }
     public string? NewSaleStatus { get; set; }
     public decimal? NewOutstandingBalance { get; set; }
+
+    public string? SourceUrl { get; set; }
 }
 
 public class PaymentVerificationItemDto
@@ -127,6 +129,8 @@ public class PaymentVerificationItemDto
     public string? ManualReviewNotes { get; set; }
     public string? ReviewedByUserName { get; set; }
     public DateTime? ReviewedAtUtc { get; set; }
+
+    public string? SourceUrl { get; set; }
 }
 
 public class PaymentVerificationFilterDto

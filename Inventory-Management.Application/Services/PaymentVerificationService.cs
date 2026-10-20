@@ -227,7 +227,22 @@ public class PaymentVerificationService : IPaymentVerificationService
 
         verification.UpdatedAtUtc = DateTime.UtcNow;
 
-        // 6. Handle transient errors or rate limits
+        // 6. Handle Telebirr cloud IP blocks (Ethio Telecom blocks foreign/cloud IPs from querying receipt gateway)
+        if (IsTelebirrCloudIpBlocked(chekiResponse, destination))
+        {
+            var receiptUrl = ResolveTelebirrReceiptUrl(chekiResponse, normalizedRef);
+            verification.SourceUrl = receiptUrl;
+            verification.VerifiedReference = normalizedRef;
+            verification.Status = PaymentVerificationStatus.NeedsManualReview;
+            verification.FailureCode = "TELEBIRR_DIRECT_VERIFICATION_REQUIRED";
+            verification.FailureMessage = "Ethio Telecom blocks cloud server verification. Please open the official Telebirr receipt directly to verify details, then approve via Manual Review.";
+
+            await _verificationRepository.UpdateAsync(verification);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            return MapToResponseDto(verification, sale, destination, false, isEligibleForRetry: false, needsManualReview: true);
+        }
+
+        // 7. Handle transient errors or rate limits
         if (chekiResponse.IsRateLimited || chekiResponse.StatusCode == 429 || chekiResponse.StatusCode >= 500)
         {
             verification.Status = PaymentVerificationStatus.Failed;
@@ -239,9 +254,23 @@ public class PaymentVerificationService : IPaymentVerificationService
             return MapToResponseDto(verification, sale, destination, false, isEligibleForRetry: true);
         }
 
-        // 7. Check if provider returned confirmed verification
+        // 8. Check if provider returned confirmed verification
         if (!chekiResponse.Success || !chekiResponse.Verified)
         {
+            if (IsTelebirrCloudIpBlocked(chekiResponse, destination))
+            {
+                var receiptUrl = ResolveTelebirrReceiptUrl(chekiResponse, normalizedRef);
+                verification.SourceUrl = receiptUrl;
+                verification.VerifiedReference = normalizedRef;
+                verification.Status = PaymentVerificationStatus.NeedsManualReview;
+                verification.FailureCode = "TELEBIRR_DIRECT_VERIFICATION_REQUIRED";
+                verification.FailureMessage = "Ethio Telecom blocks cloud server verification. Please open the official Telebirr receipt directly to verify details, then approve via Manual Review.";
+
+                await _verificationRepository.UpdateAsync(verification);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                return MapToResponseDto(verification, sale, destination, false, isEligibleForRetry: false, needsManualReview: true);
+            }
+
             verification.Status = PaymentVerificationStatus.Rejected;
             verification.FailureCode = "PROVIDER_NOT_VERIFIED";
             verification.FailureMessage = chekiResponse.Error ?? "The transaction reference could not be verified by the bank.";
@@ -468,7 +497,8 @@ public class PaymentVerificationService : IPaymentVerificationService
                 IsManualReviewApproved = v.IsManualReviewApproved,
                 ManualReviewNotes = v.ManualReviewNotes,
                 ReviewedByUserName = v.ReviewedByUserName,
-                ReviewedAtUtc = v.ReviewedAtUtc
+                ReviewedAtUtc = v.ReviewedAtUtc,
+                SourceUrl = v.SourceUrl
             })
             .ToListAsync(cancellationToken);
 
@@ -522,7 +552,8 @@ public class PaymentVerificationService : IPaymentVerificationService
             IsManualReviewApproved = v.IsManualReviewApproved,
             ManualReviewNotes = v.ManualReviewNotes,
             ReviewedByUserName = v.ReviewedByUserName,
-            ReviewedAtUtc = v.ReviewedAtUtc
+            ReviewedAtUtc = v.ReviewedAtUtc,
+            SourceUrl = v.SourceUrl
         };
     }
 
@@ -727,12 +758,63 @@ public class PaymentVerificationService : IPaymentVerificationService
             FailureMessage = v.FailureMessage,
             IsEligibleForRetry = isEligibleForRetry,
             NeedsManualReview = needsManualReview ||
+                                v.Status == PaymentVerificationStatus.NeedsManualReview ||
                                 v.Status == PaymentVerificationStatus.UnableToConfirmDestination ||
                                 v.Status == PaymentVerificationStatus.DestinationMismatch ||
                                 v.Status == PaymentVerificationStatus.AmountMismatch,
             SaleUpdated = saleUpdated,
             NewSaleStatus = sale?.Status,
-            NewOutstandingBalance = sale != null ? Math.Max(0m, sale.TotalAmount - sale.AmountReceived) : null
+            NewOutstandingBalance = sale != null ? Math.Max(0m, sale.TotalAmount - sale.AmountReceived) : null,
+            SourceUrl = v.SourceUrl
         };
+    }
+
+    private static bool IsTelebirrCloudIpBlocked(ChekiVerifyResponse response, PaymentDestination destination)
+    {
+        var err = response.Error ?? string.Empty;
+
+        // Directly checks for Cheki's Telebirr cloud IP block indicator
+        if (err.Contains("blocks cloud IPs", StringComparison.OrdinalIgnoreCase) ||
+            err.Contains("transactioninfo.ethiotelecom.et", StringComparison.OrdinalIgnoreCase) ||
+            (err.Contains("can't reach this bank", StringComparison.OrdinalIgnoreCase) && err.Contains("Telebirr", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        bool isTelebirr = string.Equals(destination.BankCode, "TELEBIRR", StringComparison.OrdinalIgnoreCase) ||
+                          (!string.IsNullOrEmpty(destination.Name) && destination.Name.Contains("telebirr", StringComparison.OrdinalIgnoreCase)) ||
+                          destination.Type == PaymentDestinationType.Telebirr;
+
+        if (isTelebirr && (err.Contains("cloud IP", StringComparison.OrdinalIgnoreCase) ||
+                           err.Contains("Our server can't reach", StringComparison.OrdinalIgnoreCase) ||
+                           response.StatusCode == 503 ||
+                           response.StatusCode == 502))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string ResolveTelebirrReceiptUrl(ChekiVerifyResponse response, string reference)
+    {
+        if (!string.IsNullOrWhiteSpace(response.SourceUrl) &&
+            response.SourceUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            return response.SourceUrl;
+        }
+
+        var err = response.Error ?? string.Empty;
+        var match = System.Text.RegularExpressions.Regex.Match(
+            err,
+            @"https?://transactioninfo\.ethiotelecom\.et/receipt/[a-zA-Z0-9_-]+",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (match.Success)
+        {
+            return match.Value;
+        }
+
+        return $"https://transactioninfo.ethiotelecom.et/receipt/{reference.Trim()}";
     }
 }
