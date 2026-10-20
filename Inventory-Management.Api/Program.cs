@@ -88,7 +88,6 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationDispatcher, Inventory_Management.Api.Services.SignalRNotificationDispatcher>();
 builder.Services.AddScoped<IEmailService, Inventory_Management.Infrastructure.Services.EmailService>();
 
-// Payment Destination & Cheki Verification Services
 builder.Services.AddHttpClient<IChekiVerificationService, ChekiVerificationService>();
 builder.Services.AddScoped<IPaymentDestinationService, PaymentDestinationService>();
 builder.Services.AddScoped<IPaymentVerificationService, PaymentVerificationService>();

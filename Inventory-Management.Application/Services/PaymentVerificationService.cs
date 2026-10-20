@@ -46,8 +46,6 @@ public class PaymentVerificationService : IPaymentVerificationService
     {
         ArgumentNullException.ThrowIfNull(dto);
 
-        if (!dto.SaleId.HasValue && dto.Cart == null)
-            throw new ArgumentException("Either a valid sale or a checkout cart must be provided.");
 
         if (dto.PaymentDestinationId == Guid.Empty)
             throw new ArgumentException("A valid payment destination must be selected.", nameof(dto.PaymentDestinationId));
@@ -268,16 +266,37 @@ public class PaymentVerificationService : IPaymentVerificationService
             return MapToResponseDto(verification, sale, destination, false);
         }
 
-        // If verified amount exceeds expected amount
-        if (verifiedAmt > expectedAmount)
+        // Allowed overpayment margin (up to 500 ETB above expected amount, above only)
+        const decimal OverpaymentMargin = 500m;
+
+        // If verified amount exceeds expected amount plus allowed margin (above only)
+        if (expectedAmount > 0m && verifiedAmt > (expectedAmount + OverpaymentMargin))
         {
             verification.Status = PaymentVerificationStatus.AmountMismatch;
             verification.FailureCode = "AMOUNT_EXCEEDS_BALANCE";
-            verification.FailureMessage = $"Verified amount of {verifiedAmt:N2} ETB exceeds the expected amount of {expectedAmount:N2} ETB.";
+            verification.FailureMessage = $"Verified amount of {verifiedAmt:N2} ETB exceeds the allowed margin (expected {expectedAmount:N2} ETB + {OverpaymentMargin:N2} ETB margin).";
 
             await _verificationRepository.UpdateAsync(verification);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             return MapToResponseDto(verification, sale, destination, false, needsManualReview: true);
+        }
+
+        // For cart checkout (POS), underpayment is not allowed (margin is above only)
+        if (dto.Cart != null && expectedAmount > 0m && verifiedAmt < expectedAmount)
+        {
+            verification.Status = PaymentVerificationStatus.AmountMismatch;
+            verification.FailureCode = "AMOUNT_UNDERPAYMENT";
+            verification.FailureMessage = $"Verified amount of {verifiedAmt:N2} ETB is less than required cart total of {expectedAmount:N2} ETB. No underpayment margin is allowed.";
+
+            await _verificationRepository.UpdateAsync(verification);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            return MapToResponseDto(verification, sale, destination, false);
+        }
+
+        // For standalone verification without a prior sale or cart, authoritative expected amount equals verified amount
+        if (expectedAmount == 0m)
+        {
+            verification.ExpectedAmount = verifiedAmt;
         }
 
         // 11. Destination Matching Evaluation
@@ -558,10 +577,6 @@ public class PaymentVerificationService : IPaymentVerificationService
             throw new InvalidOperationException($"Only failed verification attempts can be retried. Current status is {verification.Status}.");
         }
 
-        if (!verification.SaleId.HasValue)
-        {
-            throw new InvalidOperationException("Pre-checkout verifications must be retried directly from the POS checkout dialog.");
-        }
 
         var verifyReq = new VerifyPaymentRequestDto
         {

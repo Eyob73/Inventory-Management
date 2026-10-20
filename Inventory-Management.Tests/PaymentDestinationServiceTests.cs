@@ -71,7 +71,7 @@ public class PaymentDestinationServiceTests
         Assert.True(savedEntity.IsActive);
         Assert.Equal("cbe", savedEntity.BankCode);
         // Masked check
-        Assert.Equal("1000****6789", result.MaskedAccountNumber);
+        Assert.Equal("1****6789", result.MaskedAccountNumber);
     }
 
     [Fact]
@@ -147,7 +147,7 @@ public class PaymentDestinationServiceTests
     [Fact]
     public void SecurityHelper_MasksAccountNumbersProperly()
     {
-        Assert.Equal("1000****6789", PaymentDestinationSecurity.MaskAccountNumber("1000123456789"));
+        Assert.Equal("1****6789", PaymentDestinationSecurity.MaskAccountNumber("1000123456789"));
         Assert.Equal("+2519****3344", PaymentDestinationSecurity.MaskPhoneNumber("+251911223344"));
     }
 

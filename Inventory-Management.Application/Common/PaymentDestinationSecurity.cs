@@ -28,18 +28,17 @@ public static class PaymentDestinationSecurity
             return string.Empty;
 
         var cleaned = accountNumber.Trim();
+        if (cleaned.Contains('*'))
+            return cleaned;
+
         if (cleaned.Length <= 4)
             return new string('*', cleaned.Length);
 
-        if (cleaned.Length <= 8)
-        {
-            return $"{cleaned[..1]}****{cleaned[^2..]}";
-        }
+        if (cleaned.Length <= 5)
+            return $"{cleaned[..1]}***{cleaned[^1..]}";
 
-        // e.g. 1000000006171 -> 1000****6171
-        var prefixLen = Math.Min(4, cleaned.Length / 3);
-        var suffixLen = Math.Min(4, cleaned.Length / 3);
-        return $"{cleaned[..prefixLen]}****{cleaned[^suffixLen..]}";
+        // e.g. 1000000006171 -> 1****6171
+        return $"{cleaned[..1]}****{cleaned[^4..]}";
     }
 
     public static string MaskPhoneNumber(string? phoneNumber)

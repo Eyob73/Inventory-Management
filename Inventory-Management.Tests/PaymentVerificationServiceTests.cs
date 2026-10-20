@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Inventory_Management.Application.Common;
 using Inventory_Management.Application.DTOs.Payment;
+using Inventory_Management.Application.DTOs.Sale;
+using Inventory_Management.Application.DTOs.SaleItem;
 using Inventory_Management.Application.Interfaces.Repositories;
 using Inventory_Management.Application.Interfaces.Services;
 using Inventory_Management.Application.Services;
@@ -139,9 +141,9 @@ public class PaymentVerificationServiceTests
     }
 
     [Fact]
-    public async Task VerifyCustomerPayment_AmountMismatch_PreventsSaleConfirmation()
+    public async Task VerifyCustomerPayment_AmountExceeding500Margin_PreventsSaleConfirmation()
     {
-        // Arrange: Sale is 1500, but Cheki verified amount is 1800
+        // Arrange: Sale is 1500, but Cheki verified amount is 2100 (exceeds 1500 + 500 margin)
         var sale = CreateTestSale(totalAmount: 1500m, amountReceived: 0m);
         var dest = CreateTestDestination();
 
@@ -152,12 +154,11 @@ public class PaymentVerificationServiceTests
 
         _verifRepoMock.Setup(r => r.Query()).Returns(new List<PaymentVerification>().AsAsyncQueryable());
 
-        // Amount of 1800 exceeds outstanding balance of 1500
         var chekiResponse = new ChekiVerifyResponse
         {
             Success = true,
             Verified = true,
-            Amount = 1800m,
+            Amount = 2100m,
             Currency = "ETB",
             ReceiverAccount = "1000****6789"
         };
@@ -172,7 +173,7 @@ public class PaymentVerificationServiceTests
         {
             SaleId = _testSaleId,
             PaymentDestinationId = _testDestId,
-            SubmittedReference = "FT_EXCEEDS_1800"
+            SubmittedReference = "FT_EXCEEDS_2100"
         };
 
         // Act
@@ -181,8 +182,108 @@ public class PaymentVerificationServiceTests
         // Assert
         Assert.NotNull(result);
         Assert.Equal(PaymentVerificationStatus.AmountMismatch, result.Status);
+        Assert.Equal("AMOUNT_EXCEEDS_BALANCE", result.FailureCode);
         Assert.False(result.SaleUpdated);
         Assert.NotEqual("Completed", sale.Status);
+    }
+
+    [Fact]
+    public async Task VerifyCustomerPayment_AmountWithin500MarginAbove_IsVerified()
+    {
+        // Arrange: Sale is 1500, Cheki verified amount is 1800 (within 1500 + 500 margin)
+        var sale = CreateTestSale(totalAmount: 1500m, amountReceived: 0m);
+        var dest = CreateTestDestination();
+
+        _saleRepositoryMock.Setup(r => r.Query())
+            .Returns(new List<Sale> { sale }.AsAsyncQueryable());
+        _destRepoMock.Setup(r => r.Query())
+            .Returns(new List<PaymentDestination> { dest }.AsAsyncQueryable());
+
+        _verifRepoMock.Setup(r => r.Query()).Returns(new List<PaymentVerification>().AsAsyncQueryable());
+
+        var chekiResponse = new ChekiVerifyResponse
+        {
+            Success = true,
+            Verified = true,
+            Amount = 1800m,
+            Currency = "ETB",
+            ReceiverAccount = "1000****6789",
+            ReceiverName = "Primary CBE Account",
+            Date = DateTime.UtcNow.ToString("o")
+        };
+
+        _chekiServiceMock.Setup(c => c.VerifyPaymentAsync(It.IsAny<ChekiVerifyRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(chekiResponse);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var request = new VerifyPaymentRequestDto
+        {
+            SaleId = _testSaleId,
+            PaymentDestinationId = _testDestId,
+            SubmittedReference = "FT_WITHIN_MARGIN_1800"
+        };
+
+        // Act
+        var result = await _service.VerifyCustomerPaymentAsync(request, "user-1", "Cashier John");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(PaymentVerificationStatus.Verified, result.Status);
+        Assert.Equal(1800m, result.VerifiedAmount);
+        Assert.True(result.SaleUpdated);
+        Assert.Equal("Completed", sale.Status);
+    }
+
+    [Fact]
+    public async Task VerifyCustomerPayment_CartUnderpayment_TriggersAmountMismatch()
+    {
+        // Arrange: Cart total is 1000, Cheki verified is 800 (underpayment, no below margin allowed)
+        var dest = CreateTestDestination();
+        var product = new Product { Id = Guid.NewGuid(), Name = "Beer", Price = 500m, SKU = "B-1" };
+
+        _destRepoMock.Setup(r => r.Query())
+            .Returns(new List<PaymentDestination> { dest }.AsAsyncQueryable());
+        _verifRepoMock.Setup(r => r.Query()).Returns(new List<PaymentVerification>().AsAsyncQueryable());
+        _productRepoMock.Setup(r => r.GetByIdAsync(product.Id))
+            .ReturnsAsync(product);
+
+        var chekiResponse = new ChekiVerifyResponse
+        {
+            Success = true,
+            Verified = true,
+            Amount = 800m, // Under 1000m cart total
+            Currency = "ETB",
+            ReceiverAccount = "1000****6789"
+        };
+
+        _chekiServiceMock.Setup(c => c.VerifyPaymentAsync(It.IsAny<ChekiVerifyRequest>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(chekiResponse);
+
+        _unitOfWorkMock.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1);
+
+        var request = new VerifyPaymentRequestDto
+        {
+            PaymentDestinationId = _testDestId,
+            SubmittedReference = "FT_UNDERPAY_800",
+            Cart = new CreateSaleDto
+            {
+                Items = new List<CreateSaleItemDto>
+                {
+                    new CreateSaleItemDto { ProductId = product.Id, Quantity = 2, UnitPrice = 500m }
+                }
+            }
+        };
+
+        // Act
+        var result = await _service.VerifyCustomerPaymentAsync(request, "user-1", "Cashier John");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(PaymentVerificationStatus.AmountMismatch, result.Status);
+        Assert.Equal("AMOUNT_UNDERPAYMENT", result.FailureCode);
     }
 
     [Fact]
