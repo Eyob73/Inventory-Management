@@ -46,15 +46,9 @@ public class AuthController : ControllerBase
         {
             var (accessToken, refreshToken) = await _authService.LoginAsync(request);
 
-            Response.Cookies.Append("ims_refresh", refreshToken, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = !_env.IsDevelopment(),
-                SameSite = SameSiteMode.Strict,
-                Expires = DateTimeOffset.UtcNow.AddDays(7)
-            });
+            SetRefreshTokenCookie(refreshToken);
 
-            return Ok(new { message = "Login successful.", accessToken });
+            return Ok(new { message = "Login successful.", accessToken, refreshToken });
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("locked"))
         {
@@ -71,14 +65,12 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> Logout([FromBody] RefreshRequestDto? request = null)
     {
-        var refreshToken = Request.Cookies["ims_refresh"];
+        var refreshToken = string.IsNullOrEmpty(request?.RefreshToken) ? Request.Cookies["ims_refresh"] : request.RefreshToken;
         await _authService.LogoutAsync(refreshToken);
 
-        Response.Cookies.Delete("ims_refresh");
-        Response.Cookies.Delete("ims_auth");
-        Response.Cookies.Delete("XSRF-TOKEN");
+        DeleteRefreshTokenCookie();
 
         return Ok(new { message = "Logout successful." });
     }
@@ -88,7 +80,7 @@ public class AuthController : ControllerBase
     {
         try
         {
-            var tokenToRefresh = string.IsNullOrEmpty(request.RefreshToken) ? Request.Cookies["ims_refresh"] : request.RefreshToken;
+            var tokenToRefresh = string.IsNullOrEmpty(request?.RefreshToken) ? Request.Cookies["ims_refresh"] : request.RefreshToken;
             if (string.IsNullOrEmpty(tokenToRefresh))
             {
                 return Unauthorized(new { message = "Refresh token is missing." });
@@ -96,24 +88,55 @@ public class AuthController : ControllerBase
 
             var (accessToken, refreshToken) = await _authService.RefreshAsync(tokenToRefresh);
 
-            Response.Cookies.Append("ims_refresh", refreshToken, new CookieOptions
-            {
-                HttpOnly = true,
-                Secure = !_env.IsDevelopment(),
-                SameSite = SameSiteMode.None,
-                Expires = DateTimeOffset.UtcNow.AddDays(7)
-            });
+            SetRefreshTokenCookie(refreshToken);
 
-            return Ok(new { accessToken });
+            return Ok(new { accessToken, refreshToken });
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("theft"))
         {
+            DeleteRefreshTokenCookie();
             return Unauthorized(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("locked"))
+        {
+            return StatusCode(423, new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("suspended") || ex.Message.Contains("deactivated"))
+        {
+            return StatusCode(403, new { message = ex.Message });
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(new { message = ex.Message });
+            return Unauthorized(new { message = ex.Message });
         }
+    }
+
+    private void SetRefreshTokenCookie(string refreshToken)
+    {
+        var isHttps = Request.IsHttps;
+        Response.Cookies.Append("ims_refresh", refreshToken, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = isHttps || !_env.IsDevelopment(),
+            SameSite = (isHttps || !_env.IsDevelopment()) ? SameSiteMode.None : SameSiteMode.Lax,
+            Path = "/",
+            Expires = DateTimeOffset.UtcNow.AddDays(7)
+        });
+    }
+
+    private void DeleteRefreshTokenCookie()
+    {
+        var isHttps = Request.IsHttps;
+        var options = new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = isHttps || !_env.IsDevelopment(),
+            SameSite = (isHttps || !_env.IsDevelopment()) ? SameSiteMode.None : SameSiteMode.Lax,
+            Path = "/"
+        };
+        Response.Cookies.Delete("ims_refresh", options);
+        Response.Cookies.Delete("ims_auth", options);
+        Response.Cookies.Delete("XSRF-TOKEN", options);
     }
 
     [HttpPost("change-password")]

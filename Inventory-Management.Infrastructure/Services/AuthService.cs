@@ -143,8 +143,66 @@ public class AuthService : IAuthService
         {
             throw new InvalidOperationException("Invalid refresh token.");
         }
+
+        if (storedToken.IsRevoked)
+        {
+            throw new InvalidOperationException("Refresh token expired or revoked.");
+        }
+
+        // If the token was already rotated/used:
         if (storedToken.IsUsed)
         {
+            // Check if it's within the rotation grace period (storedToken.ExpiresAt stores the grace period deadline)
+            if (storedToken.ExpiresAt > DateTime.UtcNow)
+            {
+                var graceUser = await _userManager.FindByIdAsync(storedToken.UserId);
+                if (graceUser == null)
+                {
+                    throw new InvalidOperationException("User not found.");
+                }
+
+                if (await _userManager.IsLockedOutAsync(graceUser))
+                {
+                    throw new InvalidOperationException("Account locked due to multiple failed login attempts.");
+                }
+
+                string? graceTenantName = null;
+                if (graceUser.TenantId.HasValue)
+                {
+                    var tenant = await _context.Tenants
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(t => t.Id == graceUser.TenantId.Value);
+
+                    if (tenant == null)
+                    {
+                        throw new InvalidOperationException("Your company account could not be found. Please contact support.");
+                    }
+
+                    if (tenant.Status == Domain.Enums.TenantStatus.Suspended)
+                    {
+                        throw new InvalidOperationException("Your company account has been suspended. Please contact the system administrator.");
+                    }
+
+                    if (tenant.Status == Domain.Enums.TenantStatus.Deactivated || !tenant.IsActive)
+                    {
+                        throw new InvalidOperationException("Your company account has been deactivated. Please contact the system administrator.");
+                    }
+
+                    graceTenantName = tenant.Name;
+                }
+
+                var latestToken = await _context.RefreshTokens
+                    .Where(rt => rt.UserId == storedToken.UserId && !rt.IsUsed && !rt.IsRevoked && rt.ExpiresAt > DateTime.UtcNow)
+                    .OrderByDescending(rt => rt.Id)
+                    .FirstOrDefaultAsync();
+
+                var graceRoles = await _userManager.GetRolesAsync(graceUser);
+                var graceAccessToken = _tokenService.GenerateJwt(graceUser, graceRoles, graceTenantName);
+
+                return (graceAccessToken, latestToken?.Token ?? storedToken.Token);
+            }
+
+            // Outside the grace period: genuine reuse / token theft
             var userTokens = await _context.RefreshTokens
                 .Where(rt => rt.UserId == storedToken.UserId)
                 .ToListAsync();
@@ -155,11 +213,52 @@ public class AuthService : IAuthService
             await _context.SaveChangesAsync();
             throw new InvalidOperationException("Token theft detected. All user sessions revoked.");
         }
-        if (storedToken.IsRevoked || storedToken.ExpiresAt < DateTime.UtcNow)
+
+        if (storedToken.ExpiresAt < DateTime.UtcNow)
         {
             throw new InvalidOperationException("Refresh token expired or revoked.");
         }
+
+        var user = await _userManager.FindByIdAsync(storedToken.UserId);
+        if (user == null)
+        {
+            throw new InvalidOperationException("User not found.");
+        }
+
+        if (await _userManager.IsLockedOutAsync(user))
+        {
+            throw new InvalidOperationException("Account locked due to multiple failed login attempts.");
+        }
+
+        string? tenantName = null;
+        if (user.TenantId.HasValue)
+        {
+            var tenant = await _context.Tenants
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == user.TenantId.Value);
+
+            if (tenant == null)
+            {
+                throw new InvalidOperationException("Your company account could not be found. Please contact support.");
+            }
+
+            if (tenant.Status == Domain.Enums.TenantStatus.Suspended)
+            {
+                throw new InvalidOperationException("Your company account has been suspended. Please contact the system administrator.");
+            }
+
+            if (tenant.Status == Domain.Enums.TenantStatus.Deactivated || !tenant.IsActive)
+            {
+                throw new InvalidOperationException("Your company account has been deactivated. Please contact the system administrator.");
+            }
+
+            tenantName = tenant.Name;
+        }
+
+        // Mark current token as used and set grace period expiration to 60 seconds from now
         storedToken.IsUsed = true;
+        storedToken.ExpiresAt = DateTime.UtcNow.AddSeconds(60);
+
         var newRefreshToken = new RefreshToken
         {
             Token = Guid.NewGuid().ToString("N"),
@@ -170,22 +269,8 @@ public class AuthService : IAuthService
         };
         _context.RefreshTokens.Add(newRefreshToken);
         await _context.SaveChangesAsync();
-        var user = await _userManager.FindByIdAsync(storedToken.UserId);
-        var roles = await _userManager.GetRolesAsync(user!);
 
-        string? tenantName = null;
-        if (user!.TenantId.HasValue)
-        {
-            var tenant = await _context.Tenants
-                .AsNoTracking()
-                .FirstOrDefaultAsync(t => t.Id == user.TenantId.Value);
-            
-            if (tenant != null)
-            {
-                tenantName = tenant.Name;
-            }
-        }
-
+        var roles = await _userManager.GetRolesAsync(user);
         var newAccessToken = _tokenService.GenerateJwt(user, roles, tenantName);
         return (newAccessToken, newRefreshToken.Token);
     }
