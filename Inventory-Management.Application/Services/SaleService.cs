@@ -14,6 +14,7 @@ public class SaleService : ISaleService
     private readonly ISaleRepository _saleRepository;
     private readonly IGenericRepository<Product> _productRepository;
     private readonly IGenericRepository<Customer> _customerRepository;
+    private readonly IGenericRepository<PaymentVerification> _verificationRepository;
     private readonly IInventoryService _inventoryService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly INotificationService _notificationService;
@@ -25,6 +26,7 @@ public class SaleService : ISaleService
         ISaleRepository saleRepository,
         IGenericRepository<Product> productRepository,
         IGenericRepository<Customer> customerRepository,
+        IGenericRepository<PaymentVerification> verificationRepository,
         IInventoryService inventoryService,
         IUnitOfWork unitOfWork,
         INotificationService notificationService,
@@ -35,6 +37,7 @@ public class SaleService : ISaleService
         _saleRepository = saleRepository;
         _productRepository = productRepository;
         _customerRepository = customerRepository;
+        _verificationRepository = verificationRepository;
         _inventoryService = inventoryService;
         _unitOfWork = unitOfWork;
         _notificationService = notificationService;
@@ -147,6 +150,40 @@ public class SaleService : ISaleService
             sale.ChangeAmount = sale.PaymentMethod.Equals("Cash", StringComparison.OrdinalIgnoreCase)
                 ? Math.Max(0m, dto.AmountReceived - sale.TotalAmount)
                 : 0m;
+
+            if (dto.PaymentVerificationId.HasValue && dto.PaymentVerificationId.Value != Guid.Empty)
+            {
+                var verification = await _verificationRepository.GetByIdAsync(dto.PaymentVerificationId.Value)
+                    ?? throw new KeyNotFoundException($"Payment verification with ID '{dto.PaymentVerificationId.Value}' was not found.");
+
+                if (verification.Status != PaymentVerificationStatus.Verified && verification.IsManualReviewApproved != true)
+                {
+                    throw new InvalidOperationException($"Cannot link unverified payment transaction (status: {verification.Status}).");
+                }
+
+                if (verification.SaleId.HasValue && verification.SaleId.Value != Guid.Empty && verification.SaleId.Value != sale.Id)
+                {
+                    throw new InvalidOperationException("This verification record has already been associated with another sale.");
+                }
+
+                sale.PaymentVerificationId = verification.Id;
+                sale.IsPaymentVerified = true;
+                sale.PaymentVerificationStatus = "Verified";
+                verification.SaleId = sale.Id;
+                await _verificationRepository.UpdateAsync(verification);
+            }
+            else if (dto.VerificationSkipped)
+            {
+                sale.IsPaymentVerified = false;
+                sale.PaymentVerificationStatus = "Skipped";
+                var auditNote = $"[Payment Verification Skipped by {cashierName ?? userId ?? "Cashier"} at {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC]";
+                sale.Notes = string.IsNullOrWhiteSpace(sale.Notes) ? auditNote : $"{sale.Notes}\n{auditNote}";
+            }
+            else
+            {
+                sale.IsPaymentVerified = false;
+                sale.PaymentVerificationStatus = "Unverified";
+            }
 
             await _saleRepository.AddAsync(sale);
             await _unitOfWork.SaveChangesAsync();
@@ -269,6 +306,9 @@ public class SaleService : ISaleService
         ChangeAmount = s.ChangeAmount,
         Notes = s.Notes,
         Status = s.Status,
+        PaymentVerificationId = s.PaymentVerificationId,
+        IsPaymentVerified = s.IsPaymentVerified,
+        PaymentVerificationStatus = s.PaymentVerificationStatus,
         CreatedAt = s.CreatedAt,
         Items = s.SaleItems.Select(si => new SaleItemDto
         {

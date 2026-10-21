@@ -72,7 +72,7 @@ public class TenantsController : ControllerBase
     }
 
     [HttpPut("mine")]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Manager")]
     [EndpointSummary("Update current user's tenant")]
     [EndpointDescription("Updates the profile details of the current user's SaaS tenant.")]
     [ProducesResponseType(typeof(TenantDto), StatusCodes.Status200OK)]

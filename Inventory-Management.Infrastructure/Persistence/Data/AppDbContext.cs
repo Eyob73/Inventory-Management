@@ -38,6 +38,15 @@ public class AppDbContext : IdentityDbContext<AppUser>
     public DbSet<CustomerBottleBalance> CustomerBottleBalances { get; set; }
     public DbSet<BottleTransaction> BottleTransactions { get; set; }
 
+    public DbSet<PaymentDestination> PaymentDestinations { get; set; }
+    public DbSet<PaymentVerification> PaymentVerifications { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+        optionsBuilder.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

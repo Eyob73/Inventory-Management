@@ -57,6 +57,15 @@ public class SaleConfiguration : IEntityTypeConfiguration<Sale>
         builder.Property(s => s.CashierName)
             .HasMaxLength(200);
 
+        builder.Property(s => s.PaymentVerificationStatus)
+            .HasMaxLength(50);
+
+        builder.HasOne(s => s.PaymentVerification)
+            .WithMany()
+            .HasForeignKey(s => s.PaymentVerificationId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasOne(s => s.Customer)
             .WithMany(c => c.Sales)
             .HasForeignKey(s => s.CustomerId)

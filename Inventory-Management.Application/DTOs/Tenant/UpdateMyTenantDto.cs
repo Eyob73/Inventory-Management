@@ -10,4 +10,5 @@ public class UpdateMyTenantDto
     public string? TaxId { get; set; }
     public int? LowStockThreshold { get; set; }
     public bool? EnableBottleManagement { get; set; }
+    public bool? PosPaymentVerificationEnabled { get; set; }
 }

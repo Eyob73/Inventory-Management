@@ -29,6 +29,10 @@ public class Sale : IMultiTenant
     public decimal ChangeAmount { get; set; }
     public string? Notes { get; set; }
     public string Status { get; set; } = "Completed";
+    public Guid? PaymentVerificationId { get; set; }
+    public PaymentVerification? PaymentVerification { get; set; }
+    public bool IsPaymentVerified { get; set; }
+    public string? PaymentVerificationStatus { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

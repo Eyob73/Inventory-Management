@@ -19,7 +19,11 @@ using Microsoft.AspNetCore.RateLimiting;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddAuthorization();
 builder.Services.AddProblemDetails(options =>
 {
@@ -34,7 +38,10 @@ builder.Services.AddProblemDetails(options =>
 });
 
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+});
 
 var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? ["http://localhost:4200"];
 
@@ -80,6 +87,11 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<INotificationDispatcher, Inventory_Management.Api.Services.SignalRNotificationDispatcher>();
 builder.Services.AddScoped<IEmailService, Inventory_Management.Infrastructure.Services.EmailService>();
+
+builder.Services.AddHttpClient<IChekiVerificationService, ChekiVerificationService>();
+builder.Services.AddScoped<IPaymentDestinationService, PaymentDestinationService>();
+builder.Services.AddScoped<IPaymentVerificationService, PaymentVerificationService>();
+
 builder.Services.AddSignalR();
 
 // Background Queuing
