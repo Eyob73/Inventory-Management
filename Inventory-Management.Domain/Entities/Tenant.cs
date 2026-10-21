@@ -16,6 +16,6 @@ public class Tenant
     public TenantStatus Status { get; set; } = TenantStatus.Active;
     public int LowStockThreshold { get; set; } = 10;
     public bool EnableBottleManagement { get; set; } = false;
-    public bool PosPaymentVerificationEnabled { get; set; } = true;
+    public bool PosPaymentVerificationEnabled { get; set; } = false;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

@@ -15,7 +15,7 @@ namespace Inventory_Management.Infrastructure.Migrations
                 table: "Tenants",
                 type: "boolean",
                 nullable: false,
-                defaultValue: true);
+                defaultValue: false);
         }
 
         /// <inheritdoc />

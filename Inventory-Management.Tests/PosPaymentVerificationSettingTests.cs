@@ -25,6 +25,13 @@ public class PosPaymentVerificationSettingTests
     }
 
     [Fact]
+    public void Tenant_Defaults_PosPaymentVerificationEnabled_ToFalse()
+    {
+        var tenant = new Tenant();
+        Assert.False(tenant.PosPaymentVerificationEnabled);
+    }
+
+    [Fact]
     public async Task GetPosPaymentVerificationSetting_ReturnsPersistedValue()
     {
         // Arrange
