@@ -97,7 +97,9 @@ public class SaleService : ISaleService
                 CustomerName = customerName,
                 UserId = userId,
                 CashierName = cashierName,
-                PaymentMethod = string.IsNullOrWhiteSpace(dto.PaymentMethod) ? "Cash" : dto.PaymentMethod,
+                PaymentMethod = (!string.IsNullOrWhiteSpace(dto.PaymentMethod) && dto.PaymentMethod.Equals("Mobile Banking", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(dto.BankName))
+                    ? $"Mobile Banking ({dto.BankName.Trim()})"
+                    : (string.IsNullOrWhiteSpace(dto.PaymentMethod) ? "Cash" : dto.PaymentMethod),
                 Notes = dto.Notes,
                 Status = "Completed",
                 CreatedAt = DateTime.UtcNow
@@ -171,6 +173,21 @@ public class SaleService : ISaleService
                 sale.PaymentVerificationStatus = "Verified";
                 verification.SaleId = sale.Id;
                 await _verificationRepository.UpdateAsync(verification);
+
+                var bank = verification.PaymentDestination?.BankName ?? verification.PaymentDestination?.Name ?? verification.BankCode ?? verification.Provider;
+                if (!string.IsNullOrWhiteSpace(bank))
+                {
+                    if (bank.Equals("Telebirr", StringComparison.OrdinalIgnoreCase) || 
+                        string.Equals(verification.BankCode, "telebirr", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(verification.Provider, "telebirr", StringComparison.OrdinalIgnoreCase))
+                    {
+                        sale.PaymentMethod = "Telebirr";
+                    }
+                    else if (sale.PaymentMethod.StartsWith("Mobile Banking", StringComparison.OrdinalIgnoreCase) || sale.PaymentMethod == "Mobile Payment")
+                    {
+                        sale.PaymentMethod = $"Mobile Banking ({bank})";
+                    }
+                }
             }
             else if (dto.VerificationSkipped)
             {
@@ -286,45 +303,84 @@ public class SaleService : ISaleService
         });
     }
 
-    private static SaleDto MapToDto(Sale s) => new()
+    private static SaleDto MapToDto(Sale s)
     {
-        Id = s.Id,
-        SaleNumber = s.SaleNumber,
-        SaleDate = s.SaleDate,
-        CustomerId = s.CustomerId,
-        CustomerName = s.CustomerName,
-        UserId = s.UserId,
-        CashierName = s.CashierName,
-        Subtotal = s.Subtotal,
-        DiscountAmount = s.DiscountAmount,
-        TaxAmount = s.TaxAmount,
-        AdditionalBottleDeposit = s.AdditionalBottleDeposit,
-        TotalBottleDeposit = s.SaleItems.Sum(si => si.BottleDepositAmount * si.Quantity),
-        TotalAmount = s.TotalAmount,
-        PaymentMethod = s.PaymentMethod,
-        AmountReceived = s.AmountReceived,
-        ChangeAmount = s.ChangeAmount,
-        Notes = s.Notes,
-        Status = s.Status,
-        PaymentVerificationId = s.PaymentVerificationId,
-        IsPaymentVerified = s.IsPaymentVerified,
-        PaymentVerificationStatus = s.PaymentVerificationStatus,
-        CreatedAt = s.CreatedAt,
-        Items = s.SaleItems.Select(si => new SaleItemDto
+        var pv = s.PaymentVerification;
+        var bankName = pv?.PaymentDestination?.BankName ?? pv?.PaymentDestination?.Name ?? pv?.BankCode;
+        var provider = pv?.Provider;
+
+        var paymentMethod = s.PaymentMethod;
+
+        if (paymentMethod.Equals("Telebirr", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(provider, "telebirr", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(bankName, "telebirr", StringComparison.OrdinalIgnoreCase))
         {
-            Id = si.Id,
-            SaleId = si.SaleId,
-            ProductId = si.ProductId,
-            ProductName = si.ProductName,
-            SKU = si.SKU,
-            Quantity = si.Quantity,
-            UnitPrice = si.UnitPrice,
-            DiscountAmount = si.DiscountAmount,
-            Subtotal = si.Subtotal,
-            TotalPrice = si.TotalPrice,
-            IsBottleExchange = si.IsBottleExchange,
-            BottleDepositAmount = si.BottleDepositAmount
-        }).ToList()
-    };
+            paymentMethod = "Telebirr";
+            if (string.IsNullOrWhiteSpace(bankName)) bankName = "Telebirr";
+            if (string.IsNullOrWhiteSpace(provider)) provider = "telebirr";
+        }
+        else if (paymentMethod.StartsWith("Mobile Banking (", StringComparison.OrdinalIgnoreCase) && paymentMethod.EndsWith(")"))
+        {
+            if (string.IsNullOrWhiteSpace(bankName))
+            {
+                bankName = paymentMethod["Mobile Banking (".Length..^1].Trim();
+            }
+        }
+        else if (paymentMethod.Equals("Mobile Banking", StringComparison.OrdinalIgnoreCase) ||
+                 paymentMethod.Equals("Mobile Payment", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrWhiteSpace(bankName))
+            {
+                paymentMethod = $"Mobile Banking ({bankName})";
+            }
+            else
+            {
+                paymentMethod = "Mobile Banking";
+            }
+        }
+
+        return new()
+        {
+            Id = s.Id,
+            SaleNumber = s.SaleNumber,
+            SaleDate = s.SaleDate,
+            CustomerId = s.CustomerId,
+            CustomerName = s.CustomerName,
+            UserId = s.UserId,
+            CashierName = s.CashierName,
+            Subtotal = s.Subtotal,
+            DiscountAmount = s.DiscountAmount,
+            TaxAmount = s.TaxAmount,
+            AdditionalBottleDeposit = s.AdditionalBottleDeposit,
+            TotalBottleDeposit = s.SaleItems.Sum(si => si.BottleDepositAmount * si.Quantity),
+            TotalAmount = s.TotalAmount,
+            PaymentMethod = paymentMethod,
+            BankName = bankName,
+            PaymentProvider = provider,
+            AmountReceived = s.AmountReceived,
+            ChangeAmount = s.ChangeAmount,
+            Notes = s.Notes,
+            Status = s.Status,
+            PaymentVerificationId = s.PaymentVerificationId,
+            IsPaymentVerified = s.IsPaymentVerified,
+            PaymentVerificationStatus = s.PaymentVerificationStatus,
+            CreatedAt = s.CreatedAt,
+            Items = s.SaleItems.Select(si => new SaleItemDto
+            {
+                Id = si.Id,
+                SaleId = si.SaleId,
+                ProductId = si.ProductId,
+                ProductName = si.ProductName,
+                SKU = si.SKU,
+                Quantity = si.Quantity,
+                UnitPrice = si.UnitPrice,
+                DiscountAmount = si.DiscountAmount,
+                Subtotal = si.Subtotal,
+                TotalPrice = si.TotalPrice,
+                IsBottleExchange = si.IsBottleExchange,
+                BottleDepositAmount = si.BottleDepositAmount
+            }).ToList()
+        };
+    }
 }
 

@@ -23,6 +23,8 @@ public class SaleDto
     public decimal AdditionalBottleDeposit { get; set; }
 
     public string PaymentMethod { get; set; } = "Cash";
+    public string? BankName { get; set; }
+    public string? PaymentProvider { get; set; }
     public decimal AmountReceived { get; set; }
     public decimal ChangeAmount { get; set; }
     public string? Notes { get; set; }

@@ -17,6 +17,8 @@ public class SaleRepository : GenericRepository<Sale>, ISaleRepository
     {
         return await _context.Sales
             .Include(s => s.SaleItems)
+            .Include(s => s.PaymentVerification)
+                .ThenInclude(pv => pv!.PaymentDestination)
             .AsNoTracking()
             .FirstOrDefaultAsync(s => s.Id == id);
     }
@@ -25,6 +27,8 @@ public class SaleRepository : GenericRepository<Sale>, ISaleRepository
     {
         var query = _context.Sales
             .Include(s => s.SaleItems)
+            .Include(s => s.PaymentVerification)
+                .ThenInclude(pv => pv!.PaymentDestination)
             .AsNoTracking()
             .AsQueryable();
 
@@ -65,7 +69,26 @@ public class SaleRepository : GenericRepository<Sale>, ISaleRepository
 
         if (!string.IsNullOrWhiteSpace(filter.PaymentMethod))
         {
-            query = query.Where(s => s.PaymentMethod == filter.PaymentMethod);
+            var pm = filter.PaymentMethod.Trim();
+            if (pm.Equals("Mobile Banking", StringComparison.OrdinalIgnoreCase) ||
+                pm.Equals("Mobile Payment", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(s =>
+                    s.PaymentMethod.Contains("Mobile Banking") ||
+                    s.PaymentMethod.Contains("Bank") ||
+                    s.PaymentMethod == "Mobile Payment" ||
+                    (s.PaymentVerification != null && s.PaymentVerification.BankCode != "telebirr"));
+            }
+            else if (pm.Equals("Telebirr", StringComparison.OrdinalIgnoreCase))
+            {
+                query = query.Where(s =>
+                    s.PaymentMethod.Contains("Telebirr") ||
+                    (s.PaymentVerification != null && s.PaymentVerification.BankCode == "telebirr"));
+            }
+            else
+            {
+                query = query.Where(s => s.PaymentMethod == pm);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(filter.Status))
