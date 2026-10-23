@@ -91,7 +91,8 @@ public class PaymentVerificationService : IPaymentVerificationService
             if (sale.Status.Equals("Cancelled", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException($"Cannot verify payment for cancelled sale #{sale.SaleNumber}.");
 
-            expectedAmount = Math.Max(0m, sale.TotalAmount - sale.AmountReceived);
+            decimal totalPayable = sale.TotalAmount + sale.TotalBottleDeposit + sale.AdditionalBottleDeposit;
+            expectedAmount = Math.Max(0m, totalPayable - sale.AmountReceived);
             if (expectedAmount <= 0)
                 throw new InvalidOperationException($"Sale #{sale.SaleNumber} has already been fully paid.");
         }
@@ -116,7 +117,8 @@ public class PaymentVerificationService : IPaymentVerificationService
             decimal discount = Math.Max(0m, dto.Cart.DiscountAmount);
             decimal tax = Math.Max(0m, dto.Cart.TaxAmount);
             decimal additionalDeposit = Math.Max(0m, dto.Cart.AdditionalBottleDeposit);
-            expectedAmount = Math.Max(0m, subtotal - discount + tax + additionalDeposit);
+            decimal bottleDeposits = dto.Cart.Items.Where(i => !i.IsBottleExchange).Sum(i => i.BottleDepositAmount * i.Quantity);
+            expectedAmount = Math.Max(0m, subtotal - discount + tax + bottleDeposits + additionalDeposit);
 
             if (expectedAmount <= 0)
                 throw new InvalidOperationException("Calculated sale total must be greater than zero for electronic payment verification.");
@@ -585,7 +587,7 @@ public class PaymentVerificationService : IPaymentVerificationService
         var query = _saleRepository.Query()
             .AsNoTracking()
             .Where(s => s.Status.ToLower() != "cancelled" &&
-                        (s.TotalAmount - s.AmountReceived) > 0);
+                        ((s.TotalAmount + s.TotalBottleDeposit + s.AdditionalBottleDeposit) - s.AmountReceived) > 0);
 
         if (!string.IsNullOrWhiteSpace(searchTerm))
         {
@@ -604,9 +606,9 @@ public class PaymentVerificationService : IPaymentVerificationService
                 SaleNumber = s.SaleNumber,
                 CustomerId = s.CustomerId,
                 CustomerName = s.CustomerName,
-                TotalAmount = s.TotalAmount,
+                TotalAmount = s.TotalAmount + s.TotalBottleDeposit + s.AdditionalBottleDeposit,
                 AmountAlreadyPaid = s.AmountReceived,
-                OutstandingBalance = s.TotalAmount - s.AmountReceived,
+                OutstandingBalance = (s.TotalAmount + s.TotalBottleDeposit + s.AdditionalBottleDeposit) - s.AmountReceived,
                 SaleStatus = s.Status,
                 SaleDate = s.SaleDate,
                 PaymentMethod = s.PaymentMethod

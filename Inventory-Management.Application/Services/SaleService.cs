@@ -147,10 +147,15 @@ public class SaleService : ISaleService
             sale.DiscountAmount = Math.Max(0m, dto.DiscountAmount);
             sale.TaxAmount = Math.Max(0m, dto.TaxAmount);
             sale.AdditionalBottleDeposit = Math.Max(0m, dto.AdditionalBottleDeposit);
-            sale.TotalAmount = Math.Max(0m, subtotal - sale.DiscountAmount + sale.TaxAmount + sale.AdditionalBottleDeposit);
+            sale.TotalBottleDeposit = sale.SaleItems
+                .Where(si => !si.IsBottleExchange)
+                .Sum(si => si.BottleDepositAmount * si.Quantity);
+            sale.TotalAmount = Math.Max(0m, subtotal - sale.DiscountAmount + sale.TaxAmount);
             sale.AmountReceived = dto.AmountReceived;
+
+            decimal totalCustomerPayable = sale.TotalAmount + sale.TotalBottleDeposit + sale.AdditionalBottleDeposit;
             sale.ChangeAmount = sale.PaymentMethod.Equals("Cash", StringComparison.OrdinalIgnoreCase)
-                ? Math.Max(0m, dto.AmountReceived - sale.TotalAmount)
+                ? Math.Max(0m, dto.AmountReceived - totalCustomerPayable)
                 : 0m;
 
             if (dto.PaymentVerificationId.HasValue && dto.PaymentVerificationId.Value != Guid.Empty)
@@ -352,7 +357,9 @@ public class SaleService : ISaleService
             DiscountAmount = s.DiscountAmount,
             TaxAmount = s.TaxAmount,
             AdditionalBottleDeposit = s.AdditionalBottleDeposit,
-            TotalBottleDeposit = s.SaleItems.Sum(si => si.BottleDepositAmount * si.Quantity),
+            TotalBottleDeposit = s.TotalBottleDeposit > 0
+                ? s.TotalBottleDeposit
+                : s.SaleItems.Where(si => !si.IsBottleExchange).Sum(si => si.BottleDepositAmount * si.Quantity),
             TotalAmount = s.TotalAmount,
             PaymentMethod = paymentMethod,
             BankName = bankName,
