@@ -7,6 +7,7 @@ public class CreateSaleDto
     public Guid? CustomerId { get; set; }
     public string? CustomerName { get; set; }
     public string PaymentMethod { get; set; } = "Cash";
+    public string? BankName { get; set; }
     public decimal AmountReceived { get; set; }
     public decimal DiscountAmount { get; set; }
     public decimal TaxAmount { get; set; }
