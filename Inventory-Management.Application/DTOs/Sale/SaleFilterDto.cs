@@ -3,6 +3,7 @@ namespace Inventory_Management.Application.DTOs.Sale;
 public class SaleFilterDto
 {
     public string? SearchTerm { get; set; }
+    public string? DateRange { get; set; }
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
     public string? PaymentMethod { get; set; }

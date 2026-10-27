@@ -1,3 +1,4 @@
+using Inventory_Management.Application.Common;
 using Inventory_Management.Application.DTOs.Common;
 using Inventory_Management.Application.DTOs.Sale;
 using Inventory_Management.Application.Interfaces.Repositories;
@@ -55,16 +56,16 @@ public class SaleRepository : GenericRepository<Sale>, ISaleRepository
                 (s.Notes != null && s.Notes.ToLower().Contains(term)));
         }
 
-        if (filter.StartDate.HasValue)
+        var (startUtc, endUtc) = DateRangeHelper.ResolveDateRange(filter.DateRange, filter.StartDate, filter.EndDate);
+
+        if (startUtc.HasValue)
         {
-            var startUtc = DateTime.SpecifyKind(filter.StartDate.Value, DateTimeKind.Utc);
-            query = query.Where(s => s.SaleDate >= startUtc);
+            query = query.Where(s => s.SaleDate >= startUtc.Value);
         }
 
-        if (filter.EndDate.HasValue)
+        if (endUtc.HasValue)
         {
-            var endUtc = DateTime.SpecifyKind(filter.EndDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
-            query = query.Where(s => s.SaleDate <= endUtc);
+            query = query.Where(s => s.SaleDate <= endUtc.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(filter.PaymentMethod))
