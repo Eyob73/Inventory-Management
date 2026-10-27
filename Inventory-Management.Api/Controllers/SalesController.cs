@@ -65,7 +65,7 @@ public class SalesController : ControllerBase
 
     [HttpGet("paged")]
     [EndpointSummary("Retrieve paged sales history")]
-    [EndpointDescription("Fetches a paged list of recorded sales with optional search, date, cashier, and status filters.")]
+    [EndpointDescription("Fetches a paged list of recorded sales with optional search, date preset/range, cashier, and status filters.")]
     [ProducesResponseType(typeof(PagedResponse<SaleDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<SaleDto>>> GetPaged([FromQuery] SaleFilterDto filter)
     {

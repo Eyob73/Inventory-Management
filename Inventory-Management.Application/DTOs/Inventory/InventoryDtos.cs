@@ -21,6 +21,7 @@ public class InventoryTransactionFilterDto
 {
     public Guid? ProductId { get; set; }
     public string? Type { get; set; }
+    public string? DateRange { get; set; }
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
     public string? SearchTerm { get; set; }

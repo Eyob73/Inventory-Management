@@ -1,3 +1,4 @@
+using Inventory_Management.Application.Common;
 using Inventory_Management.Application.DTOs.Common;
 using Inventory_Management.Application.DTOs.Inventory;
 using Inventory_Management.Application.Interfaces.Repositories;
@@ -98,16 +99,16 @@ public class InventoryService : IInventoryService
             query = query.Where(t => t.Type == type);
         }
 
-        if (filter.StartDate.HasValue)
+        var (startUtc, endUtc) = DateRangeHelper.ResolveDateRange(filter.DateRange, filter.StartDate, filter.EndDate);
+
+        if (startUtc.HasValue)
         {
-            var start = DateTime.SpecifyKind(filter.StartDate.Value, DateTimeKind.Utc);
-            query = query.Where(t => t.CreatedAt >= start);
+            query = query.Where(t => t.CreatedAt >= startUtc.Value);
         }
 
-        if (filter.EndDate.HasValue)
+        if (endUtc.HasValue)
         {
-            var end = DateTime.SpecifyKind(filter.EndDate.Value, DateTimeKind.Utc);
-            query = query.Where(t => t.CreatedAt <= end);
+            query = query.Where(t => t.CreatedAt <= endUtc.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
