@@ -9,4 +9,7 @@ public record PagedResponse<T>
     public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
     public bool HasPrevious => Page > 1;
     public bool HasNext => Page < TotalPages;
+    public int? LowStockCount { get; init; }
+    public int? OutOfStockCount { get; init; }
+    public decimal? TotalInventoryValue { get; init; }
 }
