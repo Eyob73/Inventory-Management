@@ -4,6 +4,7 @@ using Inventory_Management.Application.DTOs.Product;
 using Inventory_Management.Application.Interfaces.Repositories;
 using Inventory_Management.Domain.Entities;
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 
 namespace Inventory_Management.Application.Features.Products.Queries;
 
@@ -69,12 +70,20 @@ public class GetPagedProductsQueryHandler : IRequestHandler<GetPagedProductsQuer
             BottleDepositAmount = p.BottleDepositAmount
         }).ToList();
 
+        var allProductsQuery = _productRepository.Query().AsNoTracking();
+        var lowStockCount = await allProductsQuery.CountAsync(p => p.QuantityInStock > 0 && p.QuantityInStock <= 15, cancellationToken);
+        var outOfStockCount = await allProductsQuery.CountAsync(p => p.QuantityInStock <= 0, cancellationToken);
+        var totalInventoryValue = await allProductsQuery.SumAsync(p => (decimal?)(p.Price * p.QuantityInStock), cancellationToken) ?? 0m;
+
         return new PagedResponse<ProductDto>
         {
             Items = mappedItems,
             Page = request.Page,
             PageSize = request.PageSize,
-            TotalCount = totalCount
+            TotalCount = totalCount,
+            LowStockCount = lowStockCount,
+            OutOfStockCount = outOfStockCount,
+            TotalInventoryValue = totalInventoryValue
         };
     }
 }
