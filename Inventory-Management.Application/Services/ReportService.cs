@@ -650,7 +650,10 @@ public class ReportService : IReportService
         };
     }
 
-    public async Task<ReportExportFile> ExportAsync(string reportType, ReportFilterDto filter, string format, CancellationToken cancellationToken = default)
+    public Task<ReportExportFile> ExportAsync(string reportType, ReportFilterDto filter, string format, CancellationToken cancellationToken = default)
+        => ExportAsync(reportType, filter, format, null, null, cancellationToken);
+
+    public async Task<ReportExportFile> ExportAsync(string reportType, ReportFilterDto filter, string format, string? tenantName, string? userName, CancellationToken cancellationToken = default)
     {
         filter.Page = 1;
         filter.PageSize = ExportMaxRows;
@@ -678,6 +681,10 @@ public class ReportService : IReportService
             new[] { "Generated", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm 'UTC'") },
             new[] { "Date range", $"{start:yyyy-MM-dd} – {end:yyyy-MM-dd}" }
         };
+        if (!string.IsNullOrWhiteSpace(tenantName))
+            meta.Add(new[] { "Tenant", tenantName });
+        if (!string.IsNullOrWhiteSpace(userName))
+            meta.Add(new[] { "User", userName });
         meta.AddRange(summary);
 
         return fmt switch
@@ -764,6 +771,9 @@ public class ReportService : IReportService
 
         var list = ordered.ToList();
 
+        var inventoryCostValue = Math.Round(list.Sum(r => r.InventoryValue), 2);
+        var inventorySellingValue = Math.Round(list.Sum(r => Math.Round(r.CurrentStock * r.SellingPrice, 2)), 2);
+
         InventoryReportSummaryDto summary;
         if (lowStockOnly)
         {
@@ -771,7 +781,8 @@ public class ReportService : IReportService
             {
                 TotalProducts = list.Count,
                 TotalStockQuantity = list.Sum(r => r.CurrentStock),
-                InventoryValue = list.Sum(r => r.InventoryValue),
+                InventoryValue = inventoryCostValue,
+                InventorySellingValue = inventorySellingValue,
                 LowStockProducts = list.Count,
                 OutOfStockProducts = list.Count(r => r.StockStatus == "Out of Stock"),
                 CriticalStockProducts = list.Count(r => r.StockStatus == "Critical Stock")
@@ -783,7 +794,8 @@ public class ReportService : IReportService
             {
                 TotalProducts = products.Count,
                 TotalStockQuantity = products.Sum(p => p.QuantityInStock),
-                InventoryValue = products.Sum(p => p.QuantityInStock * costs.GetValueOrDefault(p.Id, p.Cost)),
+                InventoryValue = inventoryCostValue,
+                InventorySellingValue = inventorySellingValue,
                 LowStockProducts = products.Count(p => p.QuantityInStock <= p.MinimumStock),
                 OutOfStockProducts = products.Count(p => p.QuantityInStock == 0),
                 CriticalStockProducts = list.Count(r => r.StockStatus == "Critical Stock")
@@ -825,7 +837,7 @@ public class ReportService : IReportService
             MinimumStock = p.MinimumStock,
             SellingPrice = p.Price,
             UnitCost = unitCost,
-            InventoryValue = Math.Round(p.QuantityInStock * unitCost, 2),
+            InventoryValue = InventoryValuationHelper.CalculateRowInventoryValue(p.QuantityInStock, unitCost),
             StockStatus = status,
             RecommendedAction = action
         };
@@ -949,23 +961,8 @@ public class ReportService : IReportService
         return (low, outOfStock);
     }
 
-    private async Task<Dictionary<Guid, decimal>> GetUnitCostsAsync(CancellationToken ct)
-    {
-        var fromPurchases = await _purchaseItems.Query().AsNoTracking()
-            .Where(pi => pi.Purchase != null && pi.Purchase.Status == PurchaseStatus.Completed && pi.Quantity > 0)
-            .GroupBy(pi => pi.ProductId)
-            .Select(g => new { ProductId = g.Key, Cost = g.Sum(x => x.TotalCost) / g.Sum(x => x.Quantity) })
-            .ToListAsync(ct);
-
-        var productCosts = await _products.Query().AsNoTracking()
-            .Select(p => new { p.Id, p.Cost })
-            .ToListAsync(ct);
-
-        var dict = productCosts.ToDictionary(p => p.Id, p => p.Cost);
-        foreach (var row in fromPurchases)
-            dict[row.ProductId] = row.Cost;
-        return dict;
-    }
+    private Task<Dictionary<Guid, decimal>> GetUnitCostsAsync(CancellationToken ct)
+        => InventoryValuationHelper.GetUnitCostsAsync(_products, _purchaseItems, ct);
 
     // ── Query filters ──────────────────────────────────────────────
 
@@ -1093,17 +1090,37 @@ public class ReportService : IReportService
 
     private async Task<(string[] Headers, List<string[]> Rows, string Title, List<string[]> Summary)> ExportInventoryAsync(ReportFilterDto filter, bool lowOnly, CancellationToken ct)
     {
-        var data = lowOnly ? (await GetLowStockAsync(filter, ct)).Table : (await GetInventoryAsync(filter, ct)).Table;
-        var rows = data.Items.Select(r => new[]
+        var report = await BuildInventoryAsync(filter, lowOnly, ct);
+        var rows = report.Table.Items.Select(r => new[]
         {
             r.Product, r.SKU, r.Category, r.CurrentStock.ToString(), r.MinimumStock.ToString(),
-            r.SellingPrice.ToString("0.00"), r.InventoryValue.ToString("0.00"), r.StockStatus, r.RecommendedAction
+            r.UnitCost.ToString("0.00"), r.SellingPrice.ToString("0.00"), r.InventoryValue.ToString("0.00"),
+            r.StockStatus, r.RecommendedAction
         }).ToList();
+
+        var summary = lowOnly
+            ? new List<string[]>
+            {
+                new[] { "Out of Stock", report.Summary.OutOfStockProducts.ToString() },
+                new[] { "Critical Stock", report.Summary.CriticalStockProducts.ToString() },
+                new[] { "Low Stock", (report.Summary.LowStockProducts - report.Summary.OutOfStockProducts - report.Summary.CriticalStockProducts).ToString() },
+                new[] { "Total Inventory Value", $"ETB {report.Summary.InventoryValue:N2}" }
+            }
+            : new List<string[]>
+            {
+                new[] { "Total Products", report.Summary.TotalProducts.ToString() },
+                new[] { "Total Stock Quantity", report.Summary.TotalStockQuantity.ToString() },
+                new[] { "Total Inventory Value", $"ETB {report.Summary.InventoryValue:N2}" },
+                new[] { "Inventory Selling Value", $"ETB {report.Summary.InventorySellingValue:N2}" },
+                new[] { "Low Stock Products", report.Summary.LowStockProducts.ToString() },
+                new[] { "Out of Stock Products", report.Summary.OutOfStockProducts.ToString() }
+            };
+
         return (
-            new[] { "Product", "SKU", "Category", "Current Stock", "Minimum Stock", "Selling Price", "Inventory Value", "Status", "Action" },
+            new[] { "Product", "SKU", "Category", "Current Stock", "Minimum Stock", "Unit Cost", "Selling Price", "Inventory Value", "Status", "Action" },
             rows,
             lowOnly ? "Low Stock Report" : "Inventory Report",
-            new List<string[]> { new[] { "Rows", data.TotalCount.ToString() } });
+            summary);
     }
 
     private async Task<(string[] Headers, List<string[]> Rows, string Title, List<string[]> Summary)> ExportProductsAsync(ReportFilterDto filter, CancellationToken ct)

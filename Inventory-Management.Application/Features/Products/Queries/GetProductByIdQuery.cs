@@ -5,7 +5,7 @@ using MediatR;
 
 namespace Inventory_Management.Application.Features.Products.Queries;
 
-public record GetProductByIdQuery(Guid Id) : IRequest<ProductDto>;
+public record GetProductByIdQuery(Guid Id, bool IncludeCost = true) : IRequest<ProductDto>;
 
 public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, ProductDto>
 {
@@ -30,7 +30,7 @@ public class GetProductByIdQueryHandler : IRequestHandler<GetProductByIdQuery, P
             Description = p.Description,
             ImageUrl = p.ImageUrl,
             Price = p.Price,
-            Cost = p.Cost,
+            Cost = request.IncludeCost ? p.Cost : 0m,
             QuantityInStock = p.QuantityInStock,
             MinimumStock = p.MinimumStock,
             IsActive = p.IsActive,

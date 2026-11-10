@@ -55,11 +55,23 @@ public static class PdfReportGenerator
             "Generated",
             DateTime.Now.ToString("dd MMM yyyy, HH:mm"));
 
+        var summaryMeta = (meta ?? new List<string[]>())
+            .Where(x => x != null && x.Length >= 2 &&
+                !string.Equals(x[0], "Report", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(x[0], "Tenant", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(x[0], "User", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(x[0], "Date Range", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(x[0], "Generated", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var safeHeaders = headers ?? Array.Empty<string>();
+        var safeRows = rows ?? new List<string[]>();
+
         var document = Document.Create(container =>
         {
             container.Page(page =>
             {
-                page.Size(PageSizes.A4);
+                page.Size(safeHeaders.Length >= 8 ? PageSizes.A4.Landscape() : PageSizes.A4);
 
                 page.MarginHorizontal(
                     1.4f,
@@ -90,8 +102,10 @@ public static class PdfReportGenerator
                     .Element(container =>
                         ComposeContent(
                             container,
-                            headers,
-                            rows));
+                            title,
+                            summaryMeta,
+                            safeHeaders,
+                            safeRows));
 
                 page.Footer()
                     .Element(footer =>
@@ -171,6 +185,8 @@ public static class PdfReportGenerator
 
     private static void ComposeContent(
         IContainer container,
+        string reportTitle,
+        List<string[]> summaryMeta,
         string[] headers,
         List<string[]> rows)
     {
@@ -178,8 +194,12 @@ public static class PdfReportGenerator
         {
             ComposeReportTitle(
                 column,
-                headers,
+                reportTitle,
                 rows);
+
+            ComposeSummaryCards(
+                column,
+                summaryMeta);
 
             if (rows == null || rows.Count == 0)
             {
@@ -200,11 +220,11 @@ public static class PdfReportGenerator
 
     private static void ComposeReportTitle(
         ColumnDescriptor column,
-        string[] headers,
+        string reportTitle,
         List<string[]> rows)
     {
         column.Item()
-            .PaddingBottom(12)
+            .PaddingBottom(10)
             .Column(title =>
             {
                 title.Item()
@@ -215,7 +235,7 @@ public static class PdfReportGenerator
 
                 title.Item()
                     .PaddingTop(3)
-                    .Text("Detailed Data Report")
+                    .Text(string.IsNullOrWhiteSpace(reportTitle) ? "Detailed Data Report" : reportTitle)
                     .FontSize(16)
                     .Bold()
                     .FontColor(Text);
@@ -235,6 +255,65 @@ public static class PdfReportGenerator
     }
 
     // ============================================================
+    // SUMMARY CARDS
+    // ============================================================
+
+    private static void ComposeSummaryCards(
+        ColumnDescriptor column,
+        List<string[]> summaryMeta)
+    {
+        if (summaryMeta == null || summaryMeta.Count == 0)
+            return;
+
+        var columnsPerRow = summaryMeta.Count == 4 ? 4 : Math.Min(3, summaryMeta.Count);
+
+        column.Item()
+            .PaddingBottom(10)
+            .Column(grid =>
+            {
+                foreach (var chunk in summaryMeta.Chunk(columnsPerRow))
+                {
+                    grid.Item()
+                        .PaddingBottom(6)
+                        .Row(row =>
+                        {
+                            row.Spacing(8);
+
+                            foreach (var item in chunk)
+                            {
+                                row.RelativeItem()
+                                    .Border(1)
+                                    .BorderColor(Border)
+                                    .Background(LightBackground)
+                                    .PaddingVertical(7)
+                                    .PaddingHorizontal(9)
+                                    .Column(card =>
+                                    {
+                                        card.Item()
+                                            .Text((item[0] ?? string.Empty).ToUpperInvariant())
+                                            .FontSize(6.5f)
+                                            .Bold()
+                                            .FontColor(MutedText);
+
+                                        card.Item()
+                                            .PaddingTop(3)
+                                            .Text(string.IsNullOrWhiteSpace(item[1]) ? "-" : item[1])
+                                            .FontSize(9.5f)
+                                            .Bold()
+                                            .FontColor(PrimaryDark);
+                                    });
+                            }
+
+                            for (var empty = chunk.Length; empty < columnsPerRow; empty++)
+                            {
+                                row.RelativeItem();
+                            }
+                        });
+                }
+            });
+    }
+
+    // ============================================================
     // TABLE
     // ============================================================
 
@@ -243,14 +322,22 @@ public static class PdfReportGenerator
         string[] headers,
         List<string[]> rows)
     {
+        if (headers == null || headers.Length == 0)
+            return;
+
+        var isWide = headers.Length >= 8;
+        var horizontalPadding = isWide ? 4f : 6f;
+        var headerFontSize = isWide ? 6.4f : 6.8f;
+        var bodyFontSize = isWide ? 6.8f : 7.2f;
+
         column.Item()
             .Table(table =>
             {
                 table.ColumnsDefinition(columns =>
                 {
-                    foreach (var _ in headers)
+                    foreach (var headerText in headers)
                     {
-                        columns.RelativeColumn();
+                        columns.RelativeColumn(GetColumnWeight(headerText));
                     }
                 });
 
@@ -262,14 +349,17 @@ public static class PdfReportGenerator
                 {
                     foreach (var headerText in headers)
                     {
-                        header.Cell()
+                        var textDesc = header.Cell()
                             .Background(PrimaryDark)
                             .PaddingVertical(7)
-                            .PaddingHorizontal(6)
-                            .Text(headerText.ToUpperInvariant())
-                            .FontSize(6.8f)
+                            .PaddingHorizontal(horizontalPadding)
+                            .Text((headerText ?? string.Empty).ToUpperInvariant())
+                            .FontSize(headerFontSize)
                             .Bold()
                             .FontColor(Colors.White);
+
+                        if (IsNumericColumn(headerText))
+                            textDesc.AlignRight();
                     }
                 });
 
@@ -286,19 +376,47 @@ public static class PdfReportGenerator
                                 ? row[i]
                                 : "-";
 
-                        table.Cell()
+                        var textDesc = table.Cell()
                             .BorderBottom(1)
                             .BorderColor(Border)
                             .Background(Colors.White)
-                            .PaddingVertical(6)
-                            .PaddingHorizontal(6)
+                            .PaddingVertical(5.5f)
+                            .PaddingHorizontal(horizontalPadding)
                             .AlignMiddle()
                             .Text(value ?? "-")
-                            .FontSize(7.2f)
+                            .FontSize(bodyFontSize)
                             .FontColor(Text);
+
+                        if (IsNumericColumn(headers[i]))
+                            textDesc.AlignRight();
                     }
                 }
             });
+    }
+
+    private static float GetColumnWeight(string? header)
+    {
+        var h = (header ?? string.Empty).Trim().ToLowerInvariant();
+        return h switch
+        {
+            "product" or "customer" or "supplier" or "action" or "performed by" => 1.8f,
+            "category" or "contact" or "invoice number" or "purchase number" or "reference number" => 1.25f,
+            "items" or "qty" or "qty change" or "previous" or "new" or "purchases"
+                or "current stock" or "minimum stock" or "units sold" or "purchase qty"
+                or "products supplied" => 0.75f,
+            "type" or "status" or "date" or "last purchase" or "payment method" => 0.95f,
+            _ => 1.15f
+        };
+    }
+
+    private static bool IsNumericColumn(string? header)
+    {
+        var h = (header ?? string.Empty).Trim().ToLowerInvariant();
+        return h is "items" or "total amount" or "current stock" or "minimum stock"
+            or "unit cost" or "selling price" or "inventory value" or "units sold"
+            or "sales revenue" or "purchase qty" or "profit" or "purchases"
+            or "total spent" or "average" or "products supplied" or "gross profit"
+            or "qty change" or "previous" or "new";
     }
 
     // ============================================================

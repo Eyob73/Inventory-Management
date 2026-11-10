@@ -24,13 +24,16 @@ public class ProductsController : ControllerBase
         _sender = sender;
     }
 
+    private bool IncludeCost()
+        => !(User?.IsInRole("Sales") == true && User?.IsInRole("Admin") != true && User?.IsInRole("Manager") != true);
+
     [HttpGet]
     [EndpointSummary("Retrieve all products")]
     [EndpointDescription("Fetches a complete un-paged list of all products in the inventory.")]
     [ProducesResponseType(typeof(IEnumerable<ProductDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<ProductDto>>> GetAll(CancellationToken cancellationToken = default)
     {
-        var products = await _sender.Send(new GetAllProductsQuery(), cancellationToken);
+        var products = await _sender.Send(new GetAllProductsQuery(IncludeCost()), cancellationToken);
         return Ok(products);
     }
 
@@ -40,7 +43,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(typeof(PagedResponse<ProductDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<PagedResponse<ProductDto>>> GetPaged([FromQuery] PagedRequest request, CancellationToken cancellationToken = default)
     {
-        var result = await _sender.Send(new GetPagedProductsQuery(request), cancellationToken);
+        var result = await _sender.Send(new GetPagedProductsQuery(request, IncludeCost()), cancellationToken);
         return Ok(result);
     }
 
@@ -51,7 +54,7 @@ public class ProductsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ProductDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var product = await _sender.Send(new GetProductByIdQuery(id), cancellationToken);
+        var product = await _sender.Send(new GetProductByIdQuery(id, IncludeCost()), cancellationToken);
         return Ok(product);
     }
 
@@ -64,7 +67,7 @@ public class ProductsController : ControllerBase
     {
         try
         {
-            var product = await _sender.Send(new GetProductByBarcodeQuery(barcode), cancellationToken);
+            var product = await _sender.Send(new GetProductByBarcodeQuery(barcode, IncludeCost()), cancellationToken);
             return Ok(product);
         }
         catch (KeyNotFoundException ex)

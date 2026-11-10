@@ -5,7 +5,7 @@ using MediatR;
 
 namespace Inventory_Management.Application.Features.Products.Queries;
 
-public record GetAllProductsQuery : IRequest<IEnumerable<ProductDto>>;
+public record GetAllProductsQuery(bool IncludeCost = true) : IRequest<IEnumerable<ProductDto>>;
 
 public class GetAllProductsQueryHandler : IRequestHandler<GetAllProductsQuery, IEnumerable<ProductDto>>
 {
@@ -28,7 +28,7 @@ public class GetAllProductsQueryHandler : IRequestHandler<GetAllProductsQuery, I
             Description = p.Description,
             ImageUrl = p.ImageUrl,
             Price = p.Price,
-            Cost = p.Cost,
+            Cost = request.IncludeCost ? p.Cost : 0m,
             QuantityInStock = p.QuantityInStock,
             MinimumStock = p.MinimumStock,
             IsActive = p.IsActive,
@@ -39,6 +39,6 @@ public class GetAllProductsQueryHandler : IRequestHandler<GetAllProductsQuery, I
             IsReturnable = p.IsReturnable,
             BottleTypeId = p.BottleTypeId,
             BottleDepositAmount = p.BottleDepositAmount
-        });
+        }).ToList();
     }
 }

@@ -580,10 +580,14 @@ public class InventoryReportDocument : IDocument
             {
                 row.Spacing(10);
 
+                var purchaseCount = _purchases.Summary.NumberOfPurchases > 0 || !_purchases.Table.Items.Any()
+                    ? _purchases.Summary.NumberOfPurchases
+                    : _purchases.Table.Items.Count;
+
                 KpiCard(
                     row.RelativeItem(),
                     "PURCHASE TRANSACTIONS",
-                    $"{_purchases.Table.Items.Count:N0}");
+                    $"{purchaseCount:N0}");
 
                 KpiCard(
                     row.RelativeItem(),
@@ -668,6 +672,14 @@ public class InventoryReportDocument : IDocument
             "CURRENT INVENTORY",
             "Current inventory position and product stock levels.");
 
+        var productCount = _inventory.Summary.TotalProducts > 0 || !_inventory.Table.Items.Any()
+            ? _inventory.Summary.TotalProducts
+            : _inventory.Table.Items.Count;
+
+        var totalQuantity = _inventory.Summary.TotalStockQuantity > 0 || !_inventory.Table.Items.Any(x => x.CurrentStock > 0)
+            ? _inventory.Summary.TotalStockQuantity
+            : _inventory.Table.Items.Sum(x => x.CurrentStock);
+
         column.Item()
             .PaddingBottom(15)
             .Row(row =>
@@ -677,24 +689,31 @@ public class InventoryReportDocument : IDocument
                 KpiCard(
                     row.RelativeItem(),
                     "PRODUCTS",
-                    $"{_inventory.Table.Items.Count:N0}");
+                    $"{productCount:N0}");
 
                 KpiCard(
                     row.RelativeItem(),
                     "INVENTORY VALUE",
                     FormatCurrency(_inventory.Summary.InventoryValue));
 
-                var quantity = _inventory.Table.Items
-                    .Sum(x => x.CurrentStock);
-
                 KpiCard(
                     row.RelativeItem(),
                     "TOTAL QUANTITY",
-                    $"{quantity:N0}");
+                    $"{totalQuantity:N0}");
             });
 
         if (!_inventory.Table.Items.Any())
             return;
+
+        if (productCount > _inventory.Table.Items.Count)
+        {
+            column.Item()
+                .PaddingBottom(6)
+                .Text($"Showing top {_inventory.Table.Items.Count:N0} of {productCount:N0} products; summary KPIs reflect all products.")
+                .FontSize(7.5f)
+                .Italic()
+                .FontColor(MutedText);
+        }
 
         column.Item()
             .PaddingBottom(25)
@@ -702,50 +721,62 @@ public class InventoryReportDocument : IDocument
             {
                 table.ColumnsDefinition(columns =>
                 {
+                    columns.RelativeColumn(1.1f);
+                    columns.RelativeColumn(2.1f);
                     columns.RelativeColumn(1.3f);
-                    columns.RelativeColumn(2.3f);
-                    columns.RelativeColumn(1.8f);
-                    columns.RelativeColumn(0.8f);
-                    columns.RelativeColumn(1.5f);
-                    columns.RelativeColumn(1.5f);
-                    columns.RelativeColumn(1.3f);
+                    columns.RelativeColumn(0.7f);
+                    columns.RelativeColumn(1.35f);
+                    columns.RelativeColumn(1.35f);
+                    columns.RelativeColumn(1.45f);
+                    columns.RelativeColumn(1.15f);
                 });
 
                 table.Header(header =>
                 {
-                    TableHeaderCell(header.Cell(), "SKU");
-                    TableHeaderCell(header.Cell(), "PRODUCT");
-                    TableHeaderCell(header.Cell(), "CATEGORY");
-                    TableHeaderCell(header.Cell(), "QTY");
-                    TableHeaderCell(header.Cell(), "COST");
-                    TableHeaderCell(header.Cell(), "SELLING PRICE");
-                    TableHeaderCell(header.Cell(), "STATUS");
+                    TableHeaderCell(header.Cell(), "SKU", compact: true);
+                    TableHeaderCell(header.Cell(), "PRODUCT", compact: true);
+                    TableHeaderCell(header.Cell(), "CATEGORY", compact: true);
+                    TableHeaderCell(header.Cell(), "QTY", compact: true, alignRight: true);
+                    TableHeaderCell(header.Cell(), "COST", compact: true, alignRight: true);
+                    TableHeaderCell(header.Cell(), "SELL PRICE", compact: true, alignRight: true);
+                    TableHeaderCell(header.Cell(), "VALUE", compact: true, alignRight: true);
+                    TableHeaderCell(header.Cell(), "STATUS", compact: true);
                 });
 
                 foreach (var item in _inventory.Table.Items)
                 {
-                    TableBodyCell(table.Cell(), item.SKU);
-                    TableBodyCell(table.Cell(), item.Product);
+                    TableBodyCell(table.Cell(), item.SKU, compact: true);
+                    TableBodyCell(table.Cell(), item.Product, compact: true);
                     TableBodyCell(
                         table.Cell(),
                         string.IsNullOrWhiteSpace(item.Category)
                             ? "-"
-                            : item.Category);
+                            : item.Category,
+                        compact: true);
 
                     TableBodyCell(
                         table.Cell(),
                         item.CurrentStock.ToString("N0"),
-                        true);
+                        alignRight: true,
+                        compact: true);
 
                     TableBodyCell(
                         table.Cell(),
                         FormatCurrency(item.UnitCost),
-                        true);
+                        alignRight: true,
+                        compact: true);
 
                     TableBodyCell(
                         table.Cell(),
                         FormatCurrency(item.SellingPrice),
-                        true);
+                        alignRight: true,
+                        compact: true);
+
+                    TableBodyCell(
+                        table.Cell(),
+                        FormatCurrency(item.InventoryValue),
+                        alignRight: true,
+                        compact: true);
 
                     StockStatusCell(
                         table.Cell(),
@@ -760,6 +791,14 @@ public class InventoryReportDocument : IDocument
 
     private void ComposeStockAlerts(ColumnDescriptor column)
     {
+        var criticalStock = _inventory.Table.Items
+            .Where(x =>
+                string.Equals(
+                    x.StockStatus,
+                    "Critical Stock",
+                    StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
         var lowStock = _inventory.Table.Items
             .Where(x =>
                 string.Equals(
@@ -776,7 +815,7 @@ public class InventoryReportDocument : IDocument
                     StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (!lowStock.Any() && !outOfStock.Any())
+        if (!criticalStock.Any() && !lowStock.Any() && !outOfStock.Any())
             return;
 
         SectionTitle(
@@ -784,23 +823,44 @@ public class InventoryReportDocument : IDocument
             "STOCK ALERTS",
             "Products requiring inventory attention.");
 
-        if (lowStock.Any())
+        var hasRenderedSection = false;
+
+        if (criticalStock.Any())
         {
             column.Item()
                 .PaddingBottom(8)
+                .Text("CRITICAL STOCK")
+                .FontSize(10)
+                .Bold()
+                .FontColor(Danger);
+
+            ComposeStockAlertTable(column, criticalStock, "CRITICAL");
+            hasRenderedSection = true;
+        }
+
+        if (lowStock.Any())
+        {
+            var item = column.Item();
+            if (hasRenderedSection)
+                item = item.PaddingTop(15);
+
+            item.PaddingBottom(8)
                 .Text("LOW STOCK")
                 .FontSize(10)
                 .Bold()
                 .FontColor(Warning);
 
             ComposeStockAlertTable(column, lowStock, "LOW");
+            hasRenderedSection = true;
         }
 
         if (outOfStock.Any())
         {
-            column.Item()
-                .PaddingTop(15)
-                .PaddingBottom(8)
+            var item = column.Item();
+            if (hasRenderedSection)
+                item = item.PaddingTop(15);
+
+            item.PaddingBottom(8)
                 .Text("OUT OF STOCK")
                 .FontSize(10)
                 .Bold()
@@ -1104,8 +1164,9 @@ public class InventoryReportDocument : IDocument
 
         decimal costValue = _inventory.Summary.InventoryValue;
 
-        decimal sellingValue = _inventory.Table.Items
-            .Sum(x => x.SellingPrice * x.CurrentStock);
+        decimal sellingValue = _inventory.Summary.InventorySellingValue > 0 || !_inventory.Table.Items.Any(x => x.SellingPrice > 0 && x.CurrentStock > 0)
+            ? _inventory.Summary.InventorySellingValue
+            : _inventory.Table.Items.Sum(x => Math.Round(x.SellingPrice * x.CurrentStock, 2));
 
         decimal potentialProfit = sellingValue - costValue;
 
@@ -1166,34 +1227,40 @@ public class InventoryReportDocument : IDocument
 
     private void TableHeaderCell(
         IContainer container,
-        string text)
+        string text,
+        bool compact = false,
+        bool alignRight = false)
     {
-        container
+        var textDesc = container
             .Background(PrimaryDark)
-            .PaddingVertical(7)
-            .PaddingHorizontal(6)
+            .PaddingVertical(compact ? 6 : 7)
+            .PaddingHorizontal(compact ? 4 : 6)
             .Text(text)
-            .FontSize(7)
+            .FontSize(compact ? 6.5f : 7)
             .Bold()
             .FontColor(Colors.White);
+
+        if (alignRight)
+            textDesc.AlignRight();
     }
 
     private void TableBodyCell(
         IContainer container,
         string? text,
-        bool alignRight = false)
+        bool alignRight = false,
+        bool compact = false)
     {
         var textDesc = container
             .BorderBottom(1)
             .BorderColor(Border)
             .Background(LightBackground)
-            .PaddingVertical(6)
-            .PaddingHorizontal(6)
+            .PaddingVertical(compact ? 5 : 6)
+            .PaddingHorizontal(compact ? 4 : 6)
             .AlignMiddle()
             .Text(text ?? "-")
-            .FontSize(7.5f)
+            .FontSize(compact ? 7f : 7.5f)
             .FontColor(Text);
-            
+
         if (alignRight)
             textDesc.AlignRight();
     }
@@ -1207,6 +1274,7 @@ public class InventoryReportDocument : IDocument
         var color = normalized switch
         {
             "low stock" => Warning,
+            "critical stock" => Danger,
             "out of stock" => Danger,
             "in stock" => Success,
             _ => MutedText
