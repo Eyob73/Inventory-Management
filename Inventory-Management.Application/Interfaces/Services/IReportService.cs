@@ -14,6 +14,8 @@ public interface IReportService
     Task<SupplierReportDto> GetSuppliersAsync(ReportFilterDto filter, CancellationToken cancellationToken = default);
     Task<ProfitReportDto> GetProfitAsync(ReportFilterDto filter, CancellationToken cancellationToken = default);
     Task<StockMovementReportDto> GetStockMovementsAsync(ReportFilterDto filter, CancellationToken cancellationToken = default);
-    Task<ReportExportFile> ExportAsync(string reportType, ReportFilterDto filter, string format, CancellationToken cancellationToken = default);
+    Task<ReportExportFile> ExportAsync(string reportType, ReportFilterDto filter, string format, CancellationToken cancellationToken = default)
+        => ExportAsync(reportType, filter, format, null, null, cancellationToken);
+    Task<ReportExportFile> ExportAsync(string reportType, ReportFilterDto filter, string format, string? tenantName, string? userName, CancellationToken cancellationToken = default);
     Task<ReportExportFile> ExportCompositeAsync(string tenantName, string userName, ReportFilterDto filter, string format, CancellationToken cancellationToken = default);
 }

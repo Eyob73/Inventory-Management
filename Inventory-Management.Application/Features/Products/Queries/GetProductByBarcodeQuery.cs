@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Inventory_Management.Application.Features.Products.Queries;
 
-public record GetProductByBarcodeQuery(string Barcode) : IRequest<ProductDto>;
+public record GetProductByBarcodeQuery(string Barcode, bool IncludeCost = true) : IRequest<ProductDto>;
 
 public class GetProductByBarcodeQueryHandler : IRequestHandler<GetProductByBarcodeQuery, ProductDto>
 {
@@ -34,7 +34,7 @@ public class GetProductByBarcodeQueryHandler : IRequestHandler<GetProductByBarco
             Description = product.Description,
             ImageUrl = product.ImageUrl,
             Price = product.Price,
-            Cost = product.Cost,
+            Cost = request.IncludeCost ? product.Cost : 0m,
             QuantityInStock = product.QuantityInStock,
             MinimumStock = product.MinimumStock,
             IsActive = product.IsActive,

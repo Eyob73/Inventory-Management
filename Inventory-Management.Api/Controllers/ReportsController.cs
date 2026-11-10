@@ -115,7 +115,9 @@ public class ReportsController : ControllerBase
     {
         try
         {
-            var file = await _reports.ExportAsync(reportType, filter, format, cancellationToken);
+            var tenantName = User.FindFirstValue("TenantName") ?? "TrackStack";
+            var userName = User.FindFirstValue(ClaimTypes.Name) ?? "System User";
+            var file = await _reports.ExportAsync(reportType, filter, format, tenantName, userName, cancellationToken);
             return File(file.Content, file.ContentType, file.FileName);
         }
         catch (ArgumentException ex)

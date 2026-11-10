@@ -44,6 +44,8 @@ public static class CompositeExcelGenerator
         Row(["Total Purchases", $"ETB {dashboard.TotalPurchases.Value:N2}"]);
         Row(["Items Sold", dashboard.TotalProductsSold.Value.ToString()]);
         Row(["Active Customers", dashboard.TotalCustomers.Value.ToString()]);
+        Row(["Inventory Value", $"ETB {inventory.Summary.InventoryValue:N2}"]);
+        Row(["Inventory Selling Value", $"ETB {inventory.Summary.InventorySellingValue:N2}"]);
         Row(["Low Stock Items", dashboard.LowStockProducts.ToString()]);
         sb.Append("</Table></Worksheet>");
 
@@ -81,7 +83,7 @@ public static class CompositeExcelGenerator
 
         // Inventory Worksheet
         sb.Append("<Worksheet ss:Name=\"Inventory\"><Table>");
-        Row(["Product", "SKU", "Category", "In Stock", "Status", "Value"]);
+        Row(["Product", "SKU", "Category", "In Stock", "Unit Cost", "Selling Price", "Status", "Value"]);
         foreach (var row in inventory.Table.Items)
         {
             Row([
@@ -89,6 +91,8 @@ public static class CompositeExcelGenerator
                 row.SKU,
                 row.Category ?? "-",
                 row.CurrentStock.ToString(),
+                row.UnitCost.ToString("0.00"),
+                row.SellingPrice.ToString("0.00"),
                 row.StockStatus ?? "-",
                 row.InventoryValue.ToString("0.00")
             ]);
